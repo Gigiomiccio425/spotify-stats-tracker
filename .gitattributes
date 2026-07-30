@@ -1,0 +1,18 @@
+# Normalizzazione automatica dei fine riga nel repository.
+* text=auto eol=lf
+
+# Questi file finiscono dentro container Linux: con i CRLF di Windows
+# smettono di funzionare (lo shebang non viene riconosciuto, Caddy non
+# interpreta le direttive).
+Dockerfile      text eol=lf
+*.sh            text eol=lf
+Caddyfile       text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Binari: nessuna conversione.
+*.png           binary
+*.jpg           binary
+*.jar           binary
+*.keystore      binary
+*.apk           binary

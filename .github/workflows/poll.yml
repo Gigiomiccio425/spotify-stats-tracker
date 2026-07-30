@@ -1,0 +1,40 @@
+name: Poll Spotify
+
+# Serve SOLO se il backend gira su un host che lo sospende quando è inattivo.
+# Su un server sempre acceso (VPS, ZimaOS) il polling avviene dentro il
+# processo con ENABLE_INTERNAL_CRON=true, e questo workflow è inutile.
+#
+# Per attivarlo: togli il commento allo `schedule` qui sotto e imposta i secret
+# BACKEND_URL e CRON_SECRET nelle impostazioni del repository.
+#
+# Nota: il cron di GitHub Actions non è puntuale. Nelle ore di punta ritarda di
+# decine di minuti, e la finestra utile di Spotify è di circa 2 ore e mezza.
+# Per un archivio senza buchi è più affidabile un servizio dedicato come
+# cron-job.org.
+
+on:
+  # schedule:
+  #   - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      # Senza questo controllo il job fallirebbe con un errore di curl poco
+      # chiaro ogni volta che parte su un repository non configurato.
+      - name: Verifica la configurazione
+        run: |
+          if [ -z "${{ secrets.BACKEND_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "Mancano i secret BACKEND_URL e/o CRON_SECRET." >&2
+            echo "Impostali in Settings > Secrets and variables > Actions." >&2
+            exit 1
+          fi
+
+      - name: Chiama l'endpoint di polling
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --max-time 300 \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.BACKEND_URL }}/cron/poll"

@@ -1,0 +1,20 @@
+# Caddy ottiene e rinnova da solo il certificato Let's Encrypt: serve solo che
+# il dominio punti all'IP della VPS e che le porte 80 e 443 siano raggiungibili.
+{$DOMAIN} {
+	encode gzip
+
+	# Header di base. HSTS lo aggiunge già Caddy sulle connessioni HTTPS.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	# L'import dell'archivio Spotify manda file da decine di MB.
+	request_body {
+		max_size 200MB
+	}
+
+	reverse_proxy backend:8787
+}

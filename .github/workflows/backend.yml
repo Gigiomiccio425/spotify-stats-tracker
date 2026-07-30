@@ -1,0 +1,43 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # I test coprono il calcolo dei periodi: confini di settimana/mese/anno,
+      # cambio di ora legale, mesi di lunghezza diversa. Non toccano il
+      # database, quindi non serve un Postgres di servizio.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

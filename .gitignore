@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.local
+deploy/.env
+*.log
+backup-*.sql.gz
+
+# Impostazioni locali di Claude Code, specifiche di questa macchina
+.claude/settings.local.json
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.apk
+*.keystore

@@ -1,0 +1,82 @@
+# Stack completo per una VPS sempre accesa (ZimaOS, Debian, Raspberry…).
+#
+# Tre servizi:
+#   db       Postgres, l'archivio degli ascolti
+#   backend  API + poller interno (nessun cron esterno necessario)
+#   caddy    HTTPS automatico via Let's Encrypt, obbligatorio perché Spotify
+#            non accetta redirect URI in HTTP se non sul loopback
+#
+# Avvio:  docker compose --env-file .env up -d --build
+
+name: spotify-stats
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stats}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?serve POSTGRES_PASSWORD nel .env}
+      POSTGRES_DB: ${POSTGRES_DB:-stats}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Nessuna porta esposta all'host: il database è raggiungibile solo dagli
+    # altri container. Su una VPS con IP pubblico esporre 5432 significa
+    # ritrovarsi scansionati nel giro di ore.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stats} -d ${POSTGRES_DB:-stats}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stats}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stats}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: https://${DOMAIN}/auth/spotify/callback
+      APP_BASE_URL: https://${DOMAIN}
+      APP_DEEP_LINK: ${APP_DEEP_LINK:-spotifystats://auth}
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_ENC_KEY: ${TOKEN_ENC_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      # Il server è sempre acceso: il poller gira dentro il processo.
+      ENABLE_INTERNAL_CRON: "true"
+      POLL_INTERVAL_MINUTES: ${POLL_INTERVAL_MINUTES:-15}
+      PORT: "8787"
+    networks: [internal, web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  # Due reti separate: caddy non ha alcuna via per raggiungere il database.
+  # Nessuna delle due è marcata `internal`, perché il backend deve poter uscire
+  # su internet per interrogare l'API di Spotify.
+  internal:
+  web:

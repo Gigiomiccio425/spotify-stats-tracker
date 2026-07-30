@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Le card generate finiscono qui: cache, così Android le ripulisce da sé. -->
+    <cache-path name="shared_cards" path="cards/" />
+</paths>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Tema solo di avvio: l'interfaccia vera è tutta in Compose.
+        Lo sfondo scuro qui evita il lampo bianco fra splash e primo frame.
+    -->
+    <style name="Theme.SpotifyStats" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
