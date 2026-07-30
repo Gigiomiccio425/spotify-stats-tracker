@@ -53,9 +53,13 @@ jobs:
 
       # Il report resta scaricabile anche quando la build fallisce: senza,
       # l'unico indizio sarebbe l'output troncato nel log.
+      # `ignore` e non `error`: se a fallire è la compilazione Kotlin, la
+      # cartella dei report non viene nemmeno creata, e un secondo errore
+      # nasconderebbe quello vero.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: build-reports
           path: android/app/build/reports/
+          if-no-files-found: ignore
           retention-days: 7
