@@ -1,7 +1,11 @@
 # Spotify Stats
 
+[![Backend](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/backend.yml/badge.svg)](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/backend.yml)
+[![Android](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml/badge.svg)](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml)
+[![Immagine backend](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/docker.yml/badge.svg)](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/docker.yml)
+
 Statistiche di ascolto Spotify con archivio storico illimitato e recap condivisibili sui social.
-App Android + backend, tutto su servizi gratuiti.
+App Android + backend self-hosted.
 
 ## Il problema
 
@@ -42,6 +46,18 @@ docs/        SETUP.md · SPOTIFY_SETUP.md · DEPLOY_ZIMAOS.md · ARCHITECTURE.md
 - Import dell'archivio *Extended Streaming History* di Spotify, per anni di storico pregresso
 - Export completo in JSON e cancellazione totale dei dati
 - Segnalazione esplicita dei possibili buchi nell'archivio
+
+## Build automatiche
+
+GitHub Actions compila tutto a ogni push su `main`:
+
+- **Backend** — typecheck, 21 test sul calcolo dei periodi, build
+- **Android** — APK di debug scaricabile dagli artifact della run
+- **Immagine backend** — pubblicata su `ghcr.io/gigiomiccio425/spotify-stats-tracker/backend`
+
+L'APK non serve compilarlo in locale: apri l'ultima run
+[Android](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml)
+e scarica l'artifact `app-debug-apk`.
 
 ## Avvio
 

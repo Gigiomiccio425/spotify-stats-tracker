@@ -12,17 +12,25 @@ sospeso, quindi il poller può girare **dentro il processo** e non serve alcun c
 - **Porte 80 e 443 aperte** verso la VPS. Caddy le usa per ottenere e rinnovare il certificato.
 - Accesso SSH alla macchina.
 
-> ZimaOS ha una schermata per importare app da un file compose, ma questo stack **compila**
-> l'immagine del backend dai sorgenti (`build:`), cosa che l'importer dell'interfaccia non gestisce.
-> Va lanciato da terminale SSH. Dopo il primo avvio l'app compare comunque nella dashboard di ZimaOS
-> e si gestisce da lì.
+## Due strade
+
+**A — immagine già compilata (consigliata).** GitHub Actions compila il backend a ogni push e
+pubblica l'immagine su `ghcr.io/gigiomiccio425/spotify-stats-tracker/backend:latest`. La VPS la
+scarica e basta: niente compilazione sulla macchina, aggiornamenti in pochi secondi. Usa
+[deploy/docker-compose.ghcr.yml](../deploy/docker-compose.ghcr.yml), che è anche l'unica variante
+importabile dall'interfaccia di ZimaOS (gestisce `image:` ma non `build:`).
+
+**B — compilazione sulla VPS.** Con [deploy/docker-compose.yml](../deploy/docker-compose.yml).
+Serve se hai modifiche locali non ancora spinte su GitHub. Va lanciata da SSH.
+
+Il resto della procedura è identico: cambia solo il file compose.
 
 ## Installazione
 
 ```bash
 ssh <utente>@<ip-della-vps>
 
-git clone <url-del-repo> spotify-stats
+git clone https://github.com/Gigiomiccio425/spotify-stats-tracker.git spotify-stats
 cd spotify-stats
 
 # Genera i tre segreti applicativi
@@ -42,18 +50,28 @@ Nella dashboard Spotify registra il Redirect URI **esatto**:
 https://<DOMAIN>/auth/spotify/callback
 ```
 
-Poi avvia:
+Poi avvia. **Strada A**, immagine da GitHub:
+
+```bash
+cd deploy
+docker compose -f docker-compose.ghcr.yml --env-file .env up -d
+```
+
+**Strada B**, compilando sulla VPS:
 
 ```bash
 cd deploy
 docker compose --env-file .env up -d --build
 ```
 
-Crea le tabelle (una volta sola):
+Crea le tabelle (una volta sola, vale per entrambe):
 
 ```bash
 docker compose exec backend npm run db:push
 ```
+
+> Con la strada A aggiungi `-f docker-compose.ghcr.yml` a **ogni** comando `docker compose`
+> successivo, altrimenti Compose usa il file di default e prova a ricompilare.
 
 Verifica:
 
@@ -101,7 +119,16 @@ docker compose restart backend
 docker compose down                   # ferma tutto (i dati restano nel volume)
 ```
 
-Aggiornamento dopo una modifica al codice:
+Aggiornamento dopo una modifica al codice.
+
+**Strada A** — aspetta che il workflow "Immagine backend" finisca su GitHub, poi:
+
+```bash
+docker compose -f docker-compose.ghcr.yml --env-file .env pull backend
+docker compose -f docker-compose.ghcr.yml --env-file .env up -d backend
+```
+
+**Strada B**:
 
 ```bash
 git pull
