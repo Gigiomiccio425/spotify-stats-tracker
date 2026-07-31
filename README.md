@@ -32,7 +32,7 @@ android/     Kotlin + Jetpack Compose, tema scuro
 
 deploy/      stack Docker per una VPS: Postgres + backend + Caddy (HTTPS automatico)
 
-docs/        SETUP.md · SPOTIFY_SETUP.md · DEPLOY_ZIMAOS.md · ARCHITECTURE.md
+docs/        changelog/ · SETUP.md · SPOTIFY_SETUP.md · DEPLOY_ZIMAOS.md · ARCHITECTURE.md
 ```
 
 ## Funzioni
