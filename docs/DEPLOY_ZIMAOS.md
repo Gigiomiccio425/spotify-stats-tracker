@@ -14,19 +14,30 @@ error: exec failed: permission denied
 
 e il backend resta a `[migrate] database non pronto … ENOTFOUND db`.
 
-L'immagine di Postgres parte come root e poi abbandona i privilegi passando
-all'utente `postgres`: se su quel sistema un processo non-root non può eseguire binari dentro il
-container, quel passaggio fallisce e Postgres non parte **mai**. Non è aggirabile dal lato del
-compose, perché Postgres si rifiuta per progetto di girare come root.
+L'immagine di Postgres parte come root e poi abbandona i privilegi passando all'utente `postgres`.
+Se quel passaggio fallisce, Postgres non parte mai.
 
-Verifica in due comandi:
+Prima verifica se la restrizione è generale o riguarda solo quell'immagine:
 
 ```bash
 sudo docker run --rm alpine echo ok                    # exec come root
 sudo docker run --rm --user 1000:1000 alpine echo ok   # exec come non-root
+sudo docker run --rm postgres:16-alpine postgres --version
+sudo docker run --rm postgres:16 postgres --version    # variante Debian
 ```
 
-Se il secondo fallisce, hai due strade.
+**Se la variante Debian funziona**, è il modo in cui l'immagine Alpine abbandona i privilegi a non
+essere gradito. Basta una riga nel `.env`:
+
+```
+POSTGRES_IMAGE=postgres:16
+```
+
+poi `docker compose … down -v` e `up -d`. Il `-v` serve perché il volume creato dall'immagine
+precedente resta in uno stato inutilizzabile.
+
+**Se falliscono i primi due comandi**, la restrizione è di sistema e nessun processo non
+privilegiato può girare nei container. Allora hai due strade.
 
 **Usare un Postgres esterno.** Quello già disponibile come app di ZimaOS, oppure un database
 gestito. Nel `.env` metti la sua URL e cancella il servizio `db` dal file compose:

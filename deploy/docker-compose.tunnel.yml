@@ -21,7 +21,11 @@ name: spotify-stats
 
 services:
   db:
-    image: postgres:16-alpine
+    # Sostituibile dal .env senza toccare questo file. La variante Debian
+    # (postgres:16) usa un meccanismo diverso per abbandonare i privilegi di
+    # root: se quella Alpine fallisce con "exec failed: permission denied",
+    # provare POSTGRES_IMAGE=postgres:16 nel .env.
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-stats}
