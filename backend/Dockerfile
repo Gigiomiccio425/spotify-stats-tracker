@@ -28,11 +28,21 @@ COPY --from=build /app/dist ./dist
 # Le migrazioni sono file SQL letti a runtime: devono stare nell'immagine.
 COPY drizzle ./drizzle
 
-USER node
-
+# Nessun `USER node` e nessuna HEALTHCHECK.
+#
+# Su ZimaOS eseguire un binario dentro il container come utente non
+# privilegiato fallisce con "exec: node: Permission denied", e l'immagine non
+# parte affatto. Stessa restrizione che rendeva inutilizzabili `docker exec` e
+# le healthcheck.
+#
+# Girare come root DENTRO il container non equivale a essere root sull'host:
+# il processo resta confinato, non pubblica porte proprie e sta dietro al
+# reverse proxy. Su un host Docker che non ha quella restrizione si può
+# rimettere l'utente non privilegiato dal compose, senza ricompilare:
+#
+#   backend:
+#     user: "node"
+#
 EXPOSE 8787
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1:8787/health || exit 1
 
 CMD ["node", "dist/src/index.js"]

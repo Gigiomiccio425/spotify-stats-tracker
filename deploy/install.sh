@@ -226,9 +226,13 @@ $DC -f "$COMPOSE_FILE" up -d
 echo
 echo "Attendo che il backend risponda…"
 
+# Il controllo passa dall'esterno e non da `docker compose exec`: su alcuni
+# sistemi eseguire comandi dentro un container fallisce con "permission
+# denied", e il controllo direbbe "non pronto" per un backend perfettamente
+# funzionante.
 ready=""
 for _ in $(seq 1 45); do
-  if $DC -f "$COMPOSE_FILE" exec -T backend wget -q -O - http://127.0.0.1:8787/health >/dev/null 2>&1; then
+  if curl -fsS --max-time 5 "https://${DOMAIN}/health" >/dev/null 2>&1; then
     ready="si"
     break
   fi
@@ -250,7 +254,10 @@ if [ -n "$ready" ]; then
   echo "Se non risponde, il certificato non e' ancora pronto: guarda"
   echo "  $DC -f $COMPOSE_FILE logs caddy"
 else
-  warn "Il backend non ha risposto entro 90 secondi."
+  warn "https://${DOMAIN}/health non ha risposto entro 90 secondi."
+  echo
+  echo "Puo' anche essere solo il certificato non ancora emesso: in quel caso"
+  echo "i log qui sotto sono puliti e basta riprovare fra un minuto."
   echo
   echo "Log dei due container che possono averlo impedito:"
   echo
