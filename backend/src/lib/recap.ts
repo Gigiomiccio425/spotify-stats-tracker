@@ -8,6 +8,7 @@ import {
   getTopGenres,
   getTopTracks,
   type Range,
+  ts,
 } from './stats.js';
 
 /**
@@ -49,7 +50,7 @@ async function getBusiestDay(userId: string, range: Range, timeZone: string) {
       count(*)::int            as "playCount",
       sum(p.ms_played)::bigint as "msPlayed"
     from plays p
-    where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+    where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
     group by 1
     order by "playCount" desc
     limit 1

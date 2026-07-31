@@ -22,6 +22,17 @@ export interface Range {
 const rows = async <T>(query: ReturnType<typeof sql>): Promise<T[]> =>
   (await db.execute(query)) as unknown as T[];
 
+/**
+ * Le date vanno passate a Postgres in ISO, non come oggetti `Date`.
+ *
+ * Dentro un template `sql` grezzo Drizzle non conosce il tipo della colonna a
+ * cui il parametro si riferisce, quindi consegna l'oggetto cosi' com'e' al
+ * driver, che prova a scriverlo come stringa e fallisce con
+ * ERR_INVALID_ARG_TYPE. Nelle query costruite con il query builder il problema
+ * non si pone, perche' li' il tipo di colonna e' noto.
+ */
+export const ts = (value: Date): string => value.toISOString();
+
 /** Espressione riutilizzata: artisti di una traccia in ordine di accredito. */
 const artistNames = sql`(
   select string_agg(a.name, ', ' order by ta.position)
@@ -53,11 +64,11 @@ export async function getOverview(userId: string, range: Range, timeZone: string
       (
         select count(distinct ta.artist_id)::int
         from plays p2 join track_artists ta on ta.track_id = p2.track_id
-        where p2.user_id = ${userId} and p2.played_at >= ${range.from} and p2.played_at < ${range.to}
+        where p2.user_id = ${userId} and p2.played_at >= ${ts(range.from)} and p2.played_at < ${ts(range.to)}
       )                                                      as "distinctArtists"
     from plays p
     join tracks t on t.id = p.track_id
-    where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+    where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
   `);
 
   return {
@@ -101,7 +112,7 @@ export async function getTopTracks(
       from plays p
       join tracks t on t.id = p.track_id
       left join albums al on al.id = t.album_id
-      where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+      where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
       group by t.id, al.name, al.image_url
       order by "playCount" desc, "msPlayed" desc, t.name asc
       limit ${limit} offset ${offset}
@@ -133,7 +144,7 @@ export async function getTopArtists(
       from plays p
       join track_artists ta on ta.track_id = p.track_id
       join artists a on a.id = ta.artist_id
-      where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+      where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
       group by a.id
       order by "playCount" desc, "msPlayed" desc, a.name asc
       limit ${limit} offset ${offset}
@@ -170,7 +181,7 @@ export async function getTopAlbums(
       from plays p
       join tracks t on t.id = p.track_id
       join albums al on al.id = t.album_id
-      where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+      where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
       group by al.id
       order by "playCount" desc, "msPlayed" desc, al.name asc
       limit ${limit} offset ${offset}
@@ -199,7 +210,7 @@ export async function getTopGenres(userId: string, range: Range, limit = 30): Pr
       join track_artists ta on ta.track_id = p.track_id
       join artists a on a.id = ta.artist_id
       cross join lateral unnest(a.genres) as g
-      where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+      where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
       group by g
       order by "playCount" desc, g asc
       limit ${limit}
@@ -229,7 +240,7 @@ export async function getTimeline(
         count(*)::int            as "playCount",
         sum(p.ms_played)::bigint as "msPlayed"
       from plays p
-      where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+      where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
       group by 1
       order by 1 asc
     `)
@@ -247,7 +258,7 @@ export async function getListeningClock(
       extract(hour from p.played_at at time zone ${timeZone})::int as hour,
       count(*)::int as "playCount"
     from plays p
-    where p.user_id = ${userId} and p.played_at >= ${range.from} and p.played_at < ${range.to}
+    where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
     group by 1
   `);
 
@@ -277,7 +288,7 @@ export async function getHistory(
   const limit = Math.min(opts.limit ?? 50, 200);
   const cursor =
     opts.before && opts.beforeId !== undefined
-      ? sql`and (p.played_at, p.id) < (${opts.before}, ${opts.beforeId})`
+      ? sql`and (p.played_at, p.id) < (${ts(opts.before)}, ${opts.beforeId})`
       : sql``;
 
   return (
