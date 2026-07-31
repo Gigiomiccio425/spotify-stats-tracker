@@ -148,6 +148,8 @@ read -r -p "Premi Invio quando l'hai fatto. "
 echo
 echo "Genero i segreti e scrivo il .env…"
 
+PG_PASSWORD="$(random_alnum 40)"
+
 umask 077
 cat > .env <<EOF
 # Generato da install.sh il $(date -u '+%Y-%m-%d %H:%M UTC')
@@ -155,9 +157,13 @@ cat > .env <<EOF
 
 DOMAIN=${DOMAIN}
 
+# Per usare un Postgres esterno invece di quello incluso, cambia questa riga
+# e cancella il servizio \`db\` dal file compose.
+DATABASE_URL=postgresql://stats:${PG_PASSWORD}@db:5432/stats
+
 POSTGRES_USER=stats
 POSTGRES_DB=stats
-POSTGRES_PASSWORD=$(random_alnum 40)
+POSTGRES_PASSWORD=${PG_PASSWORD}
 
 SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
 SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
@@ -187,7 +193,7 @@ $DOWNLOAD Caddyfile "${REPO_RAW}/Caddyfile"
 # Postgres con POSTGRES_PASSWORD vuota esce con "Database is uninitialized",
 # e Compose riporta solo "container is unhealthy". Meglio dirlo adesso.
 missing=""
-for key in DOMAIN POSTGRES_PASSWORD SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET \
+for key in DOMAIN DATABASE_URL SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET \
            JWT_SECRET TOKEN_ENC_KEY CRON_SECRET; do
   value="$(grep -E "^${key}=" .env | head -n1 | cut -d= -f2-)"
   [ -n "$value" ] || missing="${missing} ${key}"
@@ -206,10 +212,12 @@ if [ "${#enc_key}" -ne 44 ]; then
 Deve essere 32 byte in base64:  head -c 32 /dev/urandom | base64"
 fi
 
-# Finisce dentro postgresql://utente:PASSWORD@db:5432/nome: un `/`, una `@` o
-# un `:` spezzano il parsing della URL e il backend non trova il database.
+# La password finisce dentro postgresql://utente:PASSWORD@host:5432/nome: un
+# `/`, una `@` o un `:` spezzano il parsing della URL. Il controllo si applica
+# solo al Postgres incluso: con un database esterno la URL la scrive l'utente.
 pg_pass="$(grep -E '^POSTGRES_PASSWORD=' .env | head -n1 | cut -d= -f2-)"
 case "$pg_pass" in
+  '') ;;
   *[/:@#]*)
     fail "POSTGRES_PASSWORD contiene caratteri che spezzano la URL di connessione.
 Usa solo lettere e cifre:  tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40"

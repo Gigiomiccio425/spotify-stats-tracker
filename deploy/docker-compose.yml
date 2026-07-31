@@ -36,7 +36,9 @@ services:
     depends_on:
       - db
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-stats}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stats}
+      # Presa dal .env invece che composta qui: cambiando una riga si punta a
+      # un Postgres esterno, e il servizio `db` qui sotto si puo' rimuovere.
+      DATABASE_URL: ${DATABASE_URL:?serve DATABASE_URL nel .env}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
       SPOTIFY_REDIRECT_URI: https://${DOMAIN}/auth/spotify/callback

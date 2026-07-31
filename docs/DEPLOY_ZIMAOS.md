@@ -4,6 +4,49 @@ ZimaOS gira su Docker, quindi tutto lo stack si installa come un unico progetto
 `docker compose`. Rispetto a un host gratuito è nettamente meglio: il servizio non viene mai
 sospeso, quindi il poller può girare **dentro il processo** e non serve alcun cron esterno.
 
+## Se i container non riescono a eseguire processi non privilegiati
+
+Sintomo: il container del database esce subito ripetendo
+
+```
+error: exec failed: permission denied
+```
+
+e il backend resta a `[migrate] database non pronto … ENOTFOUND db`.
+
+L'immagine di Postgres parte come root e poi abbandona i privilegi passando
+all'utente `postgres`: se su quel sistema un processo non-root non può eseguire binari dentro il
+container, quel passaggio fallisce e Postgres non parte **mai**. Non è aggirabile dal lato del
+compose, perché Postgres si rifiuta per progetto di girare come root.
+
+Verifica in due comandi:
+
+```bash
+sudo docker run --rm alpine echo ok                    # exec come root
+sudo docker run --rm --user 1000:1000 alpine echo ok   # exec come non-root
+```
+
+Se il secondo fallisce, hai due strade.
+
+**Usare un Postgres esterno.** Quello già disponibile come app di ZimaOS, oppure un database
+gestito. Nel `.env` metti la sua URL e cancella il servizio `db` dal file compose:
+
+```
+DATABASE_URL=postgresql://utente:password@host:5432/nome_database
+```
+
+Il backend non ha bisogno di altro: crea le tabelle da solo al primo avvio.
+
+**Sistemare Docker.** La restrizione non è normale. Questi comandi dicono dove guardare:
+
+```bash
+sudo docker info | grep -iE 'root dir|storage driver'
+mount | grep -E 'noexec|/var/lib/docker'
+```
+
+Un `Docker Root Dir` su un filesystem che non conserva i permessi di esecuzione, o montato con
+opzioni restrittive, produce esattamente questo comportamento: root esegue, gli altri utenti no.
+
 ## Se le porte 80 e 443 sono già occupate
 
 Su ZimaOS di solito lo sono: le usa la dashboard. Verifica chi le tiene:
