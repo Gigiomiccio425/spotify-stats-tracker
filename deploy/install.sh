@@ -181,6 +181,41 @@ echo "Scarico i file dello stack…"
 $DOWNLOAD "$COMPOSE_FILE" "${REPO_RAW}/${COMPOSE_FILE}"
 $DOWNLOAD Caddyfile "${REPO_RAW}/Caddyfile"
 
+# --- Controllo del .env --------------------------------------------------
+
+# Un valore vuoto qui produce errori che non nominano la variabile colpevole:
+# Postgres con POSTGRES_PASSWORD vuota esce con "Database is uninitialized",
+# e Compose riporta solo "container is unhealthy". Meglio dirlo adesso.
+missing=""
+for key in DOMAIN POSTGRES_PASSWORD SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET \
+           JWT_SECRET TOKEN_ENC_KEY CRON_SECRET; do
+  value="$(grep -E "^${key}=" .env | head -n1 | cut -d= -f2-)"
+  [ -n "$value" ] || missing="${missing} ${key}"
+done
+
+if [ -n "$missing" ]; then
+  fail "Valori mancanti nel .env:${missing}
+Compilali con 'nano .env' e rilancia lo script."
+fi
+
+# La chiave AES-256-GCM deve essere esattamente 32 byte: in base64 sono 44
+# caratteri. Con una lunghezza diversa il backend si ferma all'avvio.
+enc_key="$(grep -E '^TOKEN_ENC_KEY=' .env | head -n1 | cut -d= -f2-)"
+if [ "${#enc_key}" -ne 44 ]; then
+  fail "TOKEN_ENC_KEY non valida: ${#enc_key} caratteri invece di 44.
+Deve essere 32 byte in base64:  head -c 32 /dev/urandom | base64"
+fi
+
+# Finisce dentro postgresql://utente:PASSWORD@db:5432/nome: un `/`, una `@` o
+# un `:` spezzano il parsing della URL e il backend non trova il database.
+pg_pass="$(grep -E '^POSTGRES_PASSWORD=' .env | head -n1 | cut -d= -f2-)"
+case "$pg_pass" in
+  *[/:@#]*)
+    fail "POSTGRES_PASSWORD contiene caratteri che spezzano la URL di connessione.
+Usa solo lettere e cifre:  tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40"
+    ;;
+esac
+
 # --- Avvio ---------------------------------------------------------------
 
 echo
@@ -217,9 +252,14 @@ if [ -n "$ready" ]; then
 else
   warn "Il backend non ha risposto entro 90 secondi."
   echo
-  echo "Quasi sempre e' un valore mancante nel .env: il processo si ferma"
-  echo "all'avvio elencando cosa manca."
+  echo "Log dei due container che possono averlo impedito:"
   echo
-  echo "  $DC -f $COMPOSE_FILE logs backend"
+  echo "--- database ---"
+  $DC -f "$COMPOSE_FILE" logs --tail 20 db 2>&1 || true
+  echo
+  echo "--- backend ---"
+  $DC -f "$COMPOSE_FILE" logs --tail 20 backend 2>&1 || true
+  echo
+  echo "Per il resto:  $DC -f $COMPOSE_FILE logs"
   exit 1
 fi
