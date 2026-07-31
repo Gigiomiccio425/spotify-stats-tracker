@@ -70,8 +70,7 @@ cd backend
 npm install
 npm run keys            # genera i segreti
 cp .env.example .env    # compila con i dati Spotify e il DATABASE_URL
-npm run db:push
-npm run dev
+npm run dev             # le migrazioni si applicano da sole all'avvio
 ```
 
 Poi [docs/SPOTIFY_SETUP.md](docs/SPOTIFY_SETUP.md) per creare l'app sulla dashboard Spotify, e

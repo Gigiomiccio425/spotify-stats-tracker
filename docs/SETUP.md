@@ -28,8 +28,14 @@ Database: con Docker `docker compose up -d`, altrimenti crea un progetto su
 [neon.tech](https://neon.tech) e incolla la connection string in `DATABASE_URL`.
 
 ```bash
-npm run db:push       # crea le tabelle
-npm run dev
+npm run dev           # le tabelle si creano da sole alla prima esecuzione
+```
+
+Le migrazioni SQL stanno in `backend/drizzle/` e vengono applicate all'avvio, prima che il server
+apra la porta. Dopo aver modificato lo schema in `src/db/schema.ts` serve rigenerarle:
+
+```bash
+npm run db:generate
 ```
 
 Verifica: `curl http://127.0.0.1:8787/health`

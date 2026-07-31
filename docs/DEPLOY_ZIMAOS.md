@@ -25,24 +25,41 @@ Serve se hai modifiche locali non ancora spinte su GitHub. Va lanciata da SSH.
 
 Il resto della procedura è identico: cambia solo il file compose.
 
-## Installazione
+## Installazione — strada A (senza clonare il repository)
+
+Con l'immagine già compilata servono solo tre file. Niente `git`, niente Node sulla VPS: su ZimaOS
+potrebbero non esserci affatto.
+
+Dal terminale di ZimaOS o via SSH:
 
 ```bash
-ssh <utente>@<ip-della-vps>
+mkdir -p /DATA/AppData/spotify-stats && cd /DATA/AppData/spotify-stats
 
-git clone https://github.com/Gigiomiccio425/spotify-stats-tracker.git spotify-stats
-cd spotify-stats
-
-# Genera i tre segreti applicativi
-cd backend && npm install && npm run keys && cd ..
-
-# Configura lo stack
-cp deploy/.env.example deploy/.env
-nano deploy/.env
+BASE=https://raw.githubusercontent.com/Gigiomiccio425/spotify-stats-tracker/main/deploy
+curl -fsSL -O $BASE/docker-compose.ghcr.yml
+curl -fsSL -O $BASE/Caddyfile
+curl -fsSL $BASE/.env.example -o .env
 ```
 
-Da compilare in `deploy/.env`: `DOMAIN`, `POSTGRES_PASSWORD` (`openssl rand -base64 32`),
-`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, e i tre segreti generati sopra.
+Genera i segreti:
+
+```bash
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '\n')"
+echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+echo "TOKEN_ENC_KEY=$(openssl rand -base64 32)"
+echo "CRON_SECRET=$(openssl rand -hex 32)"
+```
+
+`TOKEN_ENC_KEY` deve essere **esattamente 32 byte in base64**, cioè 44 caratteri che finiscono con
+`=`: è la chiave AES-256-GCM che cifra i refresh token di Spotify. Con una lunghezza diversa il
+backend si ferma all'avvio.
+
+Compila il file:
+
+```bash
+nano .env      # DOMAIN, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, e i segreti sopra
+chmod 600 .env # contiene il Client Secret e la password del database
+```
 
 Nella dashboard Spotify registra il Redirect URI **esatto**:
 
@@ -50,37 +67,39 @@ Nella dashboard Spotify registra il Redirect URI **esatto**:
 https://<DOMAIN>/auth/spotify/callback
 ```
 
-Poi avvia. **Strada A**, immagine da GitHub:
+Avvia:
 
 ```bash
-cd deploy
-docker compose -f docker-compose.ghcr.yml --env-file .env up -d
+docker compose -f docker-compose.ghcr.yml up -d
+docker compose -f docker-compose.ghcr.yml logs -f backend
 ```
 
-**Strada B**, compilando sulla VPS:
+Nei log devono comparire `[migrate] schema aggiornato` e
+`[scheduler] attivo, un giro ogni 15 minuti`.
 
-```bash
-cd deploy
-docker compose --env-file .env up -d --build
-```
-
-Crea le tabelle (una volta sola, vale per entrambe):
-
-```bash
-docker compose exec backend npm run db:push
-```
+> Le tabelle si creano da sole: il backend applica le migrazioni SQL all'avvio, prima ancora di
+> aprire la porta. Non c'è nessun comando manuale da dare.
 
 > Con la strada A aggiungi `-f docker-compose.ghcr.yml` a **ogni** comando `docker compose`
 > successivo, altrimenti Compose usa il file di default e prova a ricompilare.
 
-Verifica:
+## Installazione — strada B (compilando sulla VPS)
+
+Serve solo se hai modifiche non ancora spinte su GitHub. Richiede `git` sulla macchina.
+
+```bash
+git clone https://github.com/Gigiomiccio425/spotify-stats-tracker.git spotify-stats
+cd spotify-stats/deploy
+cp .env.example .env
+nano .env
+docker compose up -d --build
+```
+
+## Verifica
 
 ```bash
 curl https://<DOMAIN>/health
-docker compose logs -f backend
 ```
-
-Nei log deve comparire `[scheduler] attivo, un giro ogni 15 minuti`.
 
 ## Collegare il primo account
 

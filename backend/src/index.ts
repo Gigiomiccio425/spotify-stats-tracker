@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { logger } from 'hono/logger';
+import { runMigrations } from './db/migrate.js';
 import { env } from './env.js';
 import { startScheduler } from './jobs/scheduler.js';
 import { accountRoutes } from './routes/account.js';
@@ -39,6 +40,13 @@ app.onError((err, c) => {
 });
 
 app.notFound((c) => c.json({ error: 'Endpoint non trovato' }, 404));
+
+// Le migrazioni girano PRIMA di aprire la porta: se lo schema non è pronto,
+// meglio non rispondere affatto che rispondere con errori SQL. Un fallimento
+// qui ferma il processo, e Docker lo riavvia finché il database non è pronto.
+if (env.RUN_MIGRATIONS) {
+  await runMigrations();
+}
 
 // `0.0.0.0` e non il loopback: dentro un container, restare in ascolto solo su
 // 127.0.0.1 renderebbe il servizio irraggiungibile dagli altri container.

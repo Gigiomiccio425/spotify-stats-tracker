@@ -4,5 +4,7 @@ dist
 .env.*
 !.env.example
 *.log
-drizzle
 docker-compose.yml
+
+# NB: la cartella `drizzle` NON va ignorata: contiene le migrazioni SQL che il
+# backend legge all'avvio.

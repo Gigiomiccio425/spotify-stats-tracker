@@ -24,6 +24,13 @@ const schema = z.object({
     .optional()
     .transform((v) => v === 'true' || v === '1'),
   POLL_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(120).default(15),
+
+  // Le migrazioni girano all'avvio. Da disattivare solo se si hanno più
+  // istanze del backend: partirebbero insieme sullo stesso schema.
+  RUN_MIGRATIONS: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false' && v !== '0'),
 });
 
 const parsed = schema.safeParse(process.env);
