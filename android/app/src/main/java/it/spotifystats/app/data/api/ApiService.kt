@@ -20,6 +20,10 @@ interface ApiService {
     @DELETE("api/account")
     suspend fun deleteAccount(@Query("confirm") confirm: String): DeleteResult
 
+    /** Interroga Spotify subito invece di aspettare il giro dei 15 minuti. */
+    @POST("api/account/sync")
+    suspend fun sync(): SyncResult
+
     /** `range` accetta i preset: week, month, 4weeks, 6months, year,
      *  since_tracking, lifetime. In alternativa si passano from/to ISO. */
     @GET("api/stats/overview")

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import { TokenRevokedError, getValidAccessToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { plays, pollRuns, spotifyCredentials, users } from '../db/schema.js';
@@ -86,10 +86,27 @@ export async function pollUser(userId: string): Promise<PollResult> {
       ? await db.insert(plays).values(rows).onConflictDoNothing().returning({ id: plays.id })
       : [];
 
+    // Il primo poll di un utente riporta gli ultimi 50 ascolti, che sono
+    // anteriori al collegamento: senza questo, l'intervallo "Dall'inizio"
+    // risulterebbe vuoto mentre "Settimana" mostra dati, e l'utente vedrebbe
+    // due schermate in contraddizione.
+    if (rows.length) {
+      const earliest = rows.reduce(
+        (min, r) => (r.playedAt < min ? r.playedAt : min),
+        rows[0]!.playedAt,
+      );
+      await db
+        .update(users)
+        .set({ trackingSince: earliest })
+        .where(and(eq(users.id, userId), gt(users.trackingSince, earliest)));
+    }
+
     return finish({
       fetched: items.length,
       inserted: inserted.length,
-      hitPageLimit: items.length >= PAGE_LIMIT,
+      // Solo se stavamo riprendendo da un cursore: al primissimo poll una
+      // finestra piena è la norma, non il segno di qualcosa andato perso.
+      hitPageLimit: after !== undefined && items.length >= PAGE_LIMIT,
       status: 'ok',
     });
   } catch (err) {
@@ -152,10 +169,20 @@ export async function lastPollStatus(userId: string) {
     .orderBy(desc(pollRuns.startedAt))
     .limit(1);
 
+  // Il primo poll in assoluto è escluso dal conteggio: riporta gli ultimi 50
+  // ascolti e trovare la finestra piena è normale, non il segno di un buco.
+  // La condizione è sulla data e non su un flag, così vale anche per le righe
+  // scritte prima che questa distinzione esistesse.
   const [gaps] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(pollRuns)
-    .where(and(eq(pollRuns.userId, userId), eq(pollRuns.hitPageLimit, true)));
+    .where(
+      and(
+        eq(pollRuns.userId, userId),
+        eq(pollRuns.hitPageLimit, true),
+        sql`${pollRuns.startedAt} > (select min(started_at) from poll_runs where user_id = ${userId})`,
+      ),
+    );
 
   return { last: row ?? null, possibleGaps: gaps?.count ?? 0 };
 }

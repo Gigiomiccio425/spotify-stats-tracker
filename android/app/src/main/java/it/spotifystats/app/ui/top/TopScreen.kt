@@ -31,6 +31,7 @@ import it.spotifystats.app.ui.components.ErrorState
 import it.spotifystats.app.ui.components.GenreRow
 import it.spotifystats.app.ui.components.LoadingState
 import it.spotifystats.app.ui.components.RangeSelector
+import it.spotifystats.app.ui.components.Refreshable
 import it.spotifystats.app.ui.components.TrackRow
 import it.spotifystats.app.ui.components.VerticalSpacer
 import it.spotifystats.app.ui.repositoryViewModel
@@ -45,6 +46,7 @@ fun TopScreen(
 ) {
     val viewModel = repositoryViewModel { TopViewModel(it) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
 
     // La scheda e il selettore di periodo restano visibili anche durante il
     // caricamento: sparire e ricomparire a ogni cambio è disorientante.
@@ -77,15 +79,17 @@ fun TopScreen(
         RangeSelector(selected = currentRange, onSelect = viewModel::setRange)
         VerticalSpacer(8)
 
-        when (val current = state) {
-            is UiState.Loading -> LoadingState()
-            is UiState.Error -> ErrorState(current.message, onRetry = viewModel::load)
-            is UiState.Ready -> TopList(
-                data = current.data,
-                onLoadMore = viewModel::loadMore,
-                onTrackClick = onTrackClick,
-                onArtistClick = onArtistClick,
-            )
+        Refreshable(isRefreshing = refreshing, onRefresh = viewModel::refresh) {
+            when (val current = state) {
+                is UiState.Loading -> LoadingState()
+                is UiState.Error -> ErrorState(current.message, onRetry = { viewModel.load() })
+                is UiState.Ready -> TopList(
+                    data = current.data,
+                    onLoadMore = viewModel::loadMore,
+                    onTrackClick = onTrackClick,
+                    onArtistClick = onArtistClick,
+                )
+            }
         }
     }
 }

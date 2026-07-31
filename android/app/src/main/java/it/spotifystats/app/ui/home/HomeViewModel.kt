@@ -27,6 +27,9 @@ class HomeViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _state = MutableStateFlow<UiState<HomeData>>(UiState.Loading)
     val state: StateFlow<UiState<HomeData>> = _state.asStateFlow()
 
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
     private var range = "since_tracking"
 
     init {
@@ -39,9 +42,25 @@ class HomeViewModel(private val repository: StatsRepository) : ViewModel() {
         load()
     }
 
-    fun load() {
+    /**
+     * Gesto "tira giù per aggiornare": prima fa interrogare Spotify al server,
+     * poi rilegge. Senza la prima parte i dati resterebbero identici fino al
+     * giro successivo del poller e il gesto sembrerebbe inutile.
+     */
+    fun refresh() {
         viewModelScope.launch {
-            _state.value = UiState.Loading
+            _refreshing.value = true
+            // Un sync fallito non deve impedire la rilettura: i dati già
+            // archiviati vanno mostrati comunque.
+            repository.sync()
+            load(showLoading = false)
+            _refreshing.value = false
+        }
+    }
+
+    fun load(showLoading: Boolean = true) {
+        viewModelScope.launch {
+            if (showLoading) _state.value = UiState.Loading
 
             // Le quattro chiamate sono indipendenti: in parallelo la schermata
             // compare nel tempo della più lenta, non della loro somma.

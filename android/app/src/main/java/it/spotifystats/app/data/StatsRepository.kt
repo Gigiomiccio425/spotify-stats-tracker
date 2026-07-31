@@ -11,6 +11,7 @@ import it.spotifystats.app.data.api.Overview
 import it.spotifystats.app.data.api.Recap
 import it.spotifystats.app.data.api.RecapListResponse
 import it.spotifystats.app.data.api.SettingsPatch
+import it.spotifystats.app.data.api.SyncResult
 import it.spotifystats.app.data.api.TimelineResponse
 import it.spotifystats.app.data.api.TopAlbum
 import it.spotifystats.app.data.api.TopArtist
@@ -66,6 +67,13 @@ class StatsRepository(
         api.deleteAccount(spotifyUserId)
         session.clear()
     }
+
+    /**
+     * Forza un controllo su Spotify. Un fallimento qui non deve impedire di
+     * ricaricare le schermate: se il server rifiuta perché troppo ravvicinato,
+     * i dati esistenti sono comunque da rileggere.
+     */
+    suspend fun sync(): Result<SyncResult> = call { api.sync() }
 
     suspend fun overview(range: String): Result<Overview> = call { api.overview(range) }
 

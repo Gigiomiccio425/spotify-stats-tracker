@@ -226,3 +226,13 @@ data class ImportResult(
 
 @Serializable
 data class DeleteResult(val deleted: Boolean = false, val playsDeleted: Int = 0)
+
+@Serializable
+data class SyncResult(
+    /** true quando il server ha rifiutato perché l'ultimo controllo è troppo
+     *  recente: il rate limit di Spotify è per applicazione, non per utente. */
+    val skipped: Boolean = false,
+    val inserted: Int = 0,
+    val fetched: Int = 0,
+    val status: String? = null,
+)

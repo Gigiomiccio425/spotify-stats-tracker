@@ -1,10 +1,10 @@
-import { eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { users } from '../db/schema.js';
-import { lastPollStatus } from '../jobs/poll.js';
+import { pollRuns, users } from '../db/schema.js';
+import { lastPollStatus, pollUser } from '../jobs/poll.js';
 import { getHistory } from '../lib/stats.js';
 import { requireAuth, type AuthedEnv } from '../middleware/auth.js';
 
@@ -64,6 +64,34 @@ accountRoutes.patch('/me', async (c) => {
 
   return c.json({ periodMode: updated!.periodMode, timezone: updated!.timezone });
 });
+
+/**
+ * Interroga Spotify subito, senza aspettare il giro dei 15 minuti.
+ * Chiamato quando l'utente tira giù per aggiornare.
+ *
+ * Il limite di frequenza non è per proteggere il nostro server ma quello di
+ * Spotify: il rate limit è per applicazione, non per utente, quindi qualcuno
+ * che insiste col gesto di refresh danneggerebbe tutti gli altri.
+ */
+accountRoutes.post('/sync', async (c) => {
+  const user = c.get('user');
+
+  const [last] = await db
+    .select({ startedAt: pollRuns.startedAt })
+    .from(pollRuns)
+    .where(eq(pollRuns.userId, user.id))
+    .orderBy(desc(pollRuns.startedAt))
+    .limit(1);
+
+  if (last && Date.now() - last.startedAt.getTime() < MIN_SYNC_INTERVAL_MS) {
+    return c.json({ skipped: true, inserted: 0, lastRunAt: last.startedAt.toISOString() });
+  }
+
+  const result = await pollUser(user.id);
+  return c.json({ skipped: false, ...result });
+});
+
+const MIN_SYNC_INTERVAL_MS = 20_000;
 
 /**
  * Export completo dell'archivio in JSON.

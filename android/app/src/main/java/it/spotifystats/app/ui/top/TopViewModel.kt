@@ -39,6 +39,9 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _state = MutableStateFlow<UiState<TopData>>(UiState.Loading)
     val state: StateFlow<UiState<TopData>> = _state.asStateFlow()
 
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
     private var tab = TopTab.Tracks
     private var range = "since_tracking"
 
@@ -58,9 +61,18 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
         load()
     }
 
-    fun load() {
+    fun refresh() {
         viewModelScope.launch {
-            _state.value = UiState.Loading
+            _refreshing.value = true
+            repository.sync()
+            load(showLoading = false)
+            _refreshing.value = false
+        }
+    }
+
+    fun load(showLoading: Boolean = true) {
+        viewModelScope.launch {
+            if (showLoading) _state.value = UiState.Loading
             _state.value = fetch(offset = 0).fold(
                 onSuccess = { UiState.Ready(it) },
                 onFailure = { UiState.Error(it.message ?: "Impossibile caricare la classifica") },
@@ -85,10 +97,13 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
             fetch(offset).onSuccess { page ->
                 _state.value = UiState.Ready(
                     data.copy(
-                        tracks = data.tracks + page.tracks,
-                        artists = data.artists + page.artists,
-                        albums = data.albums + page.albums,
-                        genres = data.genres + page.genres,
+                        // Stessa ragione dello storico: due richieste di pagina
+                        // ravvicinate darebbero chiavi duplicate, e una chiave
+                        // duplicata in LazyColumn fa terminare l'app.
+                        tracks = (data.tracks + page.tracks).distinctBy { it.id },
+                        artists = (data.artists + page.artists).distinctBy { it.id },
+                        albums = (data.albums + page.albums).distinctBy { it.id },
+                        genres = (data.genres + page.genres).distinctBy { it.genre },
                         canLoadMore = page.canLoadMore,
                         loadingMore = false,
                     ),

@@ -21,13 +21,25 @@ class HistoryViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _state = MutableStateFlow<UiState<HistoryData>>(UiState.Loading)
     val state: StateFlow<UiState<HistoryData>> = _state.asStateFlow()
 
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
     init {
         load()
     }
 
-    fun load() {
+    fun refresh() {
         viewModelScope.launch {
-            _state.value = UiState.Loading
+            _refreshing.value = true
+            repository.sync()
+            load(showLoading = false)
+            _refreshing.value = false
+        }
+    }
+
+    fun load(showLoading: Boolean = true) {
+        viewModelScope.launch {
+            if (showLoading) _state.value = UiState.Loading
             _state.value = repository.history(cursor = null).fold(
                 onSuccess = { UiState.Ready(HistoryData(it.items, it.nextCursor)) },
                 onFailure = { UiState.Error(it.message ?: "Impossibile caricare lo storico") },
@@ -46,7 +58,11 @@ class HistoryViewModel(private val repository: StatsRepository) : ViewModel() {
             repository.history(cursor).onSuccess { page ->
                 _state.value = UiState.Ready(
                     HistoryData(
-                        items = data.items + page.items,
+                        // `distinctBy` non e' ridondante: due richieste di
+                        // pagina ravvicinate possono superare il controllo su
+                        // `loadingMore` prima che venga scritto, e una chiave
+                        // duplicata in LazyColumn fa terminare l'app.
+                        items = (data.items + page.items).distinctBy { it.id },
                         nextCursor = page.nextCursor,
                         loadingMore = false,
                     ),

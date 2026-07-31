@@ -32,6 +32,7 @@ import it.spotifystats.app.ui.components.Artwork
 import it.spotifystats.app.ui.components.EmptyState
 import it.spotifystats.app.ui.components.ErrorState
 import it.spotifystats.app.ui.components.LoadingState
+import it.spotifystats.app.ui.components.Refreshable
 import it.spotifystats.app.ui.components.VerticalSpacer
 import it.spotifystats.app.ui.repositoryViewModel
 import it.spotifystats.app.ui.theme.Accent
@@ -43,11 +44,14 @@ import it.spotifystats.app.ui.theme.TextTertiary
 fun HistoryScreen(onTrackClick: (String) -> Unit) {
     val viewModel = repositoryViewModel { HistoryViewModel(it) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
 
-    when (val current = state) {
-        is UiState.Loading -> LoadingState()
-        is UiState.Error -> ErrorState(current.message, onRetry = viewModel::load)
-        is UiState.Ready -> HistoryList(current.data, viewModel::loadMore, onTrackClick)
+    Refreshable(isRefreshing = refreshing, onRefresh = viewModel::refresh) {
+        when (val current = state) {
+            is UiState.Loading -> LoadingState()
+            is UiState.Error -> ErrorState(current.message, onRetry = { viewModel.load() })
+            is UiState.Ready -> HistoryList(current.data, viewModel::loadMore, onTrackClick)
+        }
     }
 }
 

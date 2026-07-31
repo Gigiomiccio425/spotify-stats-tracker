@@ -36,18 +36,26 @@ object Format {
         return "%d:%02d".format(total / 60, total % 60)
     }
 
+    /**
+     * Una data che non si riesce a interpretare non deve far crashare una
+     * schermata intera: il server potrebbe cambiare formato, e una riga con un
+     * trattino al posto dell'ora resta leggibile.
+     */
+    private fun parse(iso: String?): Instant? =
+        iso?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
     fun date(iso: String?): String =
-        iso?.let { dayFormatter.format(Instant.parse(it).atZone(zone)) } ?: "—"
+        parse(iso)?.let { dayFormatter.format(it.atZone(zone)) } ?: "—"
 
     fun shortDate(iso: String?): String =
-        iso?.let { shortDayFormatter.format(Instant.parse(it).atZone(zone)) } ?: "—"
+        parse(iso)?.let { shortDayFormatter.format(it.atZone(zone)) } ?: "—"
 
     fun time(iso: String?): String =
-        iso?.let { timeFormatter.format(Instant.parse(it).atZone(zone)) } ?: "—"
+        parse(iso)?.let { timeFormatter.format(it.atZone(zone)) } ?: "—"
 
     /** "oggi", "ieri" o la data estesa: usato per le intestazioni dello storico. */
     fun relativeDay(iso: String): String {
-        val date = Instant.parse(iso).atZone(zone).toLocalDate()
+        val date = parse(iso)?.atZone(zone)?.toLocalDate() ?: return "Data sconosciuta"
         val today = Instant.now().atZone(zone).toLocalDate()
         return when (date) {
             today -> "Oggi"
@@ -56,9 +64,10 @@ object Format {
         }
     }
 
-    fun dayKey(iso: String): String = Instant.parse(iso).atZone(zone).toLocalDate().toString()
+    fun dayKey(iso: String): String =
+        parse(iso)?.atZone(zone)?.toLocalDate()?.toString() ?: "sconosciuto"
 
     /** "da 34 giorni" per la data di inizio tracciamento. */
     fun daysSince(iso: String): Long =
-        Duration.between(Instant.parse(iso), Instant.now()).toDays()
+        parse(iso)?.let { Duration.between(it, Instant.now()).toDays() } ?: 0
 }

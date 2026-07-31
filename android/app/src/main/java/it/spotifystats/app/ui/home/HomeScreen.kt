@@ -30,6 +30,7 @@ import it.spotifystats.app.ui.components.LabeledBarChart
 import it.spotifystats.app.ui.components.ListeningClock
 import it.spotifystats.app.ui.components.LoadingState
 import it.spotifystats.app.ui.components.RangeSelector
+import it.spotifystats.app.ui.components.Refreshable
 import it.spotifystats.app.ui.components.SectionTitle
 import it.spotifystats.app.ui.components.StatTile
 import it.spotifystats.app.ui.components.TrackRow
@@ -47,16 +48,19 @@ fun HomeScreen(
 ) {
     val viewModel = repositoryViewModel { HomeViewModel(it) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
 
-    when (val current = state) {
-        is UiState.Loading -> LoadingState()
-        is UiState.Error -> ErrorState(current.message, onRetry = viewModel::load)
-        is UiState.Ready -> HomeContent(
-            data = current.data,
-            onRangeChange = viewModel::setRange,
-            onTrackClick = onTrackClick,
-            onArtistClick = onArtistClick,
-        )
+    Refreshable(isRefreshing = refreshing, onRefresh = viewModel::refresh) {
+        when (val current = state) {
+            is UiState.Loading -> LoadingState()
+            is UiState.Error -> ErrorState(current.message, onRetry = { viewModel.load() })
+            is UiState.Ready -> HomeContent(
+                data = current.data,
+                onRangeChange = viewModel::setRange,
+                onTrackClick = onTrackClick,
+                onArtistClick = onArtistClick,
+            )
+        }
     }
 }
 
