@@ -219,11 +219,13 @@ export async function getTimeline(
   bucket: 'day' | 'week' | 'month',
   timeZone: string,
 ): Promise<TimelinePoint[]> {
-  const unit = sql.raw(bucket);
   return (
     await rows<TimelinePoint>(sql`
       select
-        to_char(date_trunc(${unit}, p.played_at at time zone ${timeZone}), 'YYYY-MM-DD') as bucket,
+        -- L'unità va passata come parametro, non interpolata nel testo della
+        -- query: date_trunc vuole un valore di tipo text, e date_trunc(day, ...)
+        -- senza apici farebbe cercare a Postgres una colonna di nome "day".
+        to_char(date_trunc(${bucket}, p.played_at at time zone ${timeZone}), 'YYYY-MM-DD') as bucket,
         count(*)::int            as "playCount",
         sum(p.ms_played)::bigint as "msPlayed"
       from plays p
