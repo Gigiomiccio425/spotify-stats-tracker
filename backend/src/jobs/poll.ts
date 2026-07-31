@@ -86,6 +86,19 @@ export async function pollUser(userId: string): Promise<PollResult> {
       ? await db.insert(plays).values(rows).onConflictDoNothing().returning({ id: plays.id })
       : [];
 
+    // Gli artisti appena inseriti hanno solo id e nome: senza questo, chi tira
+    // giù per aggiornare vedrebbe i nuovi artisti senza foto né generi fino al
+    // giro programmato successivo, fino a un quarto d'ora dopo.
+    if (inserted.length) {
+      try {
+        await enrichPendingArtists(100);
+      } catch (err) {
+        // L'arricchimento è un di più: non deve far fallire l'archiviazione,
+        // che è la sola cosa irrecuperabile se salta.
+        console.error('[poll] arricchimento artisti fallito', err);
+      }
+    }
+
     // Il primo poll di un utente riporta gli ultimi 50 ascolti, che sono
     // anteriori al collegamento: senza questo, l'intervallo "Dall'inizio"
     // risulterebbe vuoto mentre "Settimana" mostra dati, e l'utente vedrebbe

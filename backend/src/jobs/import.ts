@@ -99,7 +99,15 @@ export async function importStreamingHistory(
       imported += inserted.length;
     }
 
-    await enrichPendingArtists(500);
+    // Un archivio di anni porta dentro migliaia di artisti nuovi. Una sola
+    // tornata da 500 ne lascerebbe la maggior parte senza foto né generi, e la
+    // coda si smaltirebbe al ritmo di una tornata ogni quarto d'ora. Qui si
+    // insiste finché non resta nulla, con un tetto che evita di restare
+    // appesi su un archivio smisurato.
+    for (let round = 0; round < 40; round++) {
+      const enriched = await enrichPendingArtists(500);
+      if (enriched === 0) break;
+    }
 
     const result = {
       jobId,

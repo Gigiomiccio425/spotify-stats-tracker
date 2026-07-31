@@ -110,20 +110,22 @@ export async function upsertTracksFromSpotify(spotifyTracks: SpotifyTrack[]): Pr
  */
 export async function enrichPendingArtists(limit = 200): Promise<number> {
   // Due categorie insieme:
-  //  - mai arricchiti (popularity ancora NULL);
-  //  - arricchiti ma senza generi da più di una settimana.
+  //  - mai arricchiti (popularity ancora NULL): arrivano da `recently-played`,
+  //    che manda solo id e nome, quindi non hanno né foto né generi;
+  //  - arricchiti ma rimasti senza foto o senza generi da più di una settimana.
+  //
   // La seconda esiste perché un errore momentaneo delle credenziali
-  // applicative lasciava l'artista con `popularity = 0` e generi vuoti, e con
-  // il solo controllo su NULL non veniva più ritentato: le statistiche per
-  // genere restavano vuote per sempre. `fetched_at` viene riscritto a ogni
-  // tentativo, quindi chi davvero non ha generi su Spotify viene ricontrollato
-  // al massimo una volta a settimana.
+  // applicative lasciava l'artista con `popularity = 0` e i campi vuoti, e con
+  // il solo controllo su NULL non veniva più ritentato: restava senza foto per
+  // sempre. `fetched_at` viene riscritto a ogni tentativo, quindi chi davvero
+  // non ha immagini su Spotify viene ricontrollato al massimo una volta a
+  // settimana.
   const pending = await db
     .select({ id: artists.id })
     .from(artists)
     .where(
       sql`${artists.popularity} is null
-          or (cardinality(${artists.genres}) = 0
+          or ((cardinality(${artists.genres}) = 0 or ${artists.imageUrl} is null)
               and ${artists.fetchedAt} < now() - interval '7 days')`,
     )
     .limit(limit);
