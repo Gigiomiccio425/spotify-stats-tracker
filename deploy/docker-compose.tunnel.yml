@@ -42,6 +42,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Il tunnel NON ha bisogno di questa porta: raggiunge `backend:8787`
+    # attraverso la rete Docker. Serve solo per arrivarci in locale, per
+    # diagnosticare o per usare l'app in rete locale senza passare da
+    # Cloudflare.
+    #
+    # Di default resta legata a 127.0.0.1, quindi e' raggiungibile solo dalla
+    # macchina stessa (via SSH: curl http://127.0.0.1:8787/health).
+    #
+    # Per aprirla alla rete locale metti BACKEND_BIND=0.0.0.0 nel .env.
+    # ATTENZIONE: qui non c'e' TLS. Su una macchina con IP pubblico, 0.0.0.0
+    # espone l'API in chiaro su internet, JWT di sessione compresi. Fallo solo
+    # se la macchina sta dietro un router e la porta non e' inoltrata.
+    ports:
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-8787}:8787"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-stats}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stats}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
