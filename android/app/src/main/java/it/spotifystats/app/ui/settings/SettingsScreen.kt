@@ -121,6 +121,7 @@ private fun SettingsContent(
     onChangeServer: () -> Unit,
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as StatsApplication
     var confirmDelete by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
@@ -157,6 +158,45 @@ private fun SettingsContent(
 
         HorizontalDivider(color = SurfaceElevated)
         ServerSection(serverUrl, onChangeServer)
+
+        HorizontalDivider(color = SurfaceElevated)
+        SectionTitle("Collegamento a Spotify")
+
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            if (me.spotify.linked) {
+                Text("Attivo", style = MaterialTheme.typography.bodyLarge, color = Accent)
+                Text(
+                    "Il server interroga Spotify per tuo conto ogni 15 minuti.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                )
+            } else {
+                Text("Interrotto", style = MaterialTheme.typography.bodyLarge, color = Danger)
+                Text(
+                    me.spotify.invalidReason
+                        ?: "Il server non riesce più a interrogare Spotify per tuo conto.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                )
+                Text(
+                    "Nessun nuovo ascolto viene archiviato finché non ricolleghi. " +
+                        "Quelli già in archivio restano.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            TextButton(
+                onClick = { app.auth.startLogin(context) },
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Text(
+                    if (me.spotify.linked) "Ricollega comunque" else "Ricollega account Spotify",
+                    color = Accent,
+                )
+            }
+        }
 
         HorizontalDivider(color = SurfaceElevated)
         SectionTitle("Stato archiviazione")

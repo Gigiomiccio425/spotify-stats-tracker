@@ -37,6 +37,7 @@ import it.spotifystats.app.ui.components.TrackRow
 import it.spotifystats.app.ui.components.VerticalSpacer
 import it.spotifystats.app.ui.repositoryViewModel
 import it.spotifystats.app.ui.theme.Accent
+import it.spotifystats.app.ui.theme.Danger
 import it.spotifystats.app.ui.theme.SurfaceElevated
 import it.spotifystats.app.ui.theme.TextSecondary
 import it.spotifystats.app.ui.theme.Warning
@@ -86,6 +87,12 @@ private fun HomeContent(
                     color = TextSecondary,
                 )
             }
+        }
+
+        // Il collegamento interrotto viene prima di tutto il resto: finché non
+        // si ricollega, l'archivio non cresce e ogni numero sotto è fermo.
+        if (!data.me.spotify.linked) {
+            item { SpotifyDisconnectedWarning(data.me.spotify.invalidReason) }
         }
 
         // Se il poller ha trovato la finestra piena, parte dello storico può
@@ -220,6 +227,35 @@ private fun TopArtistsStrip(data: HomeData, onArtistClick: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SpotifyDisconnectedWarning(reason: String?) {
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(SurfaceElevated)
+            .padding(12.dp),
+    ) {
+        Text(
+            "Collegamento a Spotify interrotto",
+            style = MaterialTheme.typography.titleMedium,
+            color = Danger,
+        )
+        Text(
+            reason ?: "Il server non riesce più a interrogare Spotify per conto tuo.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+        )
+        Text(
+            "Finché non ricolleghi l'account da Profilo, nessun nuovo ascolto viene archiviato.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

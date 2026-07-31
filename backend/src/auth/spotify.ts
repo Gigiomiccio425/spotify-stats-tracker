@@ -164,7 +164,27 @@ export async function getValidAccessToken(userId: string): Promise<string> {
     return decryptToken(cred.accessTokenEnc);
   }
 
-  const refreshToken = await decryptToken(cred.refreshTokenEnc);
+  let refreshToken: string;
+  try {
+    refreshToken = await decryptToken(cred.refreshTokenEnc);
+  } catch {
+    // AES-GCM fallisce l'autenticazione se la chiave non è quella con cui il
+    // token è stato cifrato. Succede quando TOKEN_ENC_KEY viene rigenerata
+    // dopo il collegamento: senza questo ramo il refresh partirebbe con dati
+    // illeggibili e Spotify risponderebbe `invalid_grant`, facendo credere a
+    // una revoca da parte dell'utente.
+    await db
+      .update(spotifyCredentials)
+      .set({
+        invalidatedAt: new Date(),
+        invalidReason: 'TOKEN_ENC_KEY cambiata dopo il collegamento: ricollega l account',
+      })
+      .where(eq(spotifyCredentials.userId, userId));
+    throw new TokenRevokedError(
+      'Credenziali non decifrabili: la chiave di cifratura è cambiata. Ricollega l account Spotify.',
+    );
+  }
+
   try {
     const tokens = await refreshAccessToken(refreshToken);
     await saveCredentials(userId, tokens, refreshToken);

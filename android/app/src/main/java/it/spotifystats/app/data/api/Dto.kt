@@ -21,6 +21,13 @@ data class SyncStatus(
 )
 
 @Serializable
+data class SpotifyLink(
+    val linked: Boolean = true,
+    val invalidatedAt: String? = null,
+    val invalidReason: String? = null,
+)
+
+@Serializable
 data class Me(
     val id: String,
     val spotifyUserId: String,
@@ -33,6 +40,10 @@ data class Me(
     /** Ora a cui comincia la giornata nei recap giornalieri, 0-23. */
     val dailyRecapHour: Int = 0,
     val sync: SyncStatus = SyncStatus(),
+    /** Stato del collegamento a Spotify, distinto dalla sessione dell'app:
+     *  si puo' restare autenticati qui mentre il poller non riesce piu' a
+     *  interrogare Spotify. */
+    val spotify: SpotifyLink = SpotifyLink(),
 )
 
 @Serializable

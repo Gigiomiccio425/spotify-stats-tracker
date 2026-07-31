@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { pollRuns, users } from '../db/schema.js';
+import { pollRuns, spotifyCredentials, users } from '../db/schema.js';
 import { lastPollStatus, pollUser } from '../jobs/poll.js';
 import { getHistory } from '../lib/stats.js';
 import { requireAuth, type AuthedEnv } from '../middleware/auth.js';
@@ -16,7 +16,25 @@ accountRoutes.get('/me', async (c) => {
   const user = c.get('user');
   const { last, possibleGaps } = await lastPollStatus(user.id);
 
+  // Lo stato del collegamento a Spotify è separato da quello della sessione
+  // dell'app: si può restare autenticati qui mentre il poller non riesce più a
+  // interrogare Spotify. Senza dirlo, l'archivio smetterebbe di crescere in
+  // silenzio e l'utente se ne accorgerebbe giorni dopo.
+  const [credentials] = await db
+    .select({
+      invalidatedAt: spotifyCredentials.invalidatedAt,
+      invalidReason: spotifyCredentials.invalidReason,
+    })
+    .from(spotifyCredentials)
+    .where(eq(spotifyCredentials.userId, user.id))
+    .limit(1);
+
   return c.json({
+    spotify: {
+      linked: Boolean(credentials) && credentials!.invalidatedAt === null,
+      invalidatedAt: credentials?.invalidatedAt?.toISOString() ?? null,
+      invalidReason: credentials?.invalidReason ?? null,
+    },
     id: user.id,
     spotifyUserId: user.spotifyUserId,
     displayName: user.displayName,
