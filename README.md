@@ -76,9 +76,17 @@ npm run dev             # le migrazioni si applicano da sole all'avvio
 Poi [docs/SPOTIFY_SETUP.md](docs/SPOTIFY_SETUP.md) per creare l'app sulla dashboard Spotify, e
 Android Studio sulla cartella `android/`.
 
-**In produzione su una VPS** (consigliato): [docs/DEPLOY_ZIMAOS.md](docs/DEPLOY_ZIMAOS.md).
-Un `docker compose up -d --build` tira su tutto, il poller gira dentro il processo e non serve
-alcun cron esterno.
+**In produzione su una VPS** (consigliato) bastano due comandi:
+
+```bash
+curl -fsSL -O https://raw.githubusercontent.com/Gigiomiccio425/spotify-stats-tracker/main/deploy/install.sh
+bash install.sh
+```
+
+Lo script chiede dominio, Client ID e Client Secret, genera i segreti, scrive il `.env` e avvia
+Postgres, backend e Caddy con HTTPS automatico. Le tabelle si creano da sole all'avvio e il poller
+gira dentro il processo: nessun cron esterno. Dettagli in
+[docs/DEPLOY_ZIMAOS.md](docs/DEPLOY_ZIMAOS.md).
 
 Sugli host che sospendono il servizio quando è inattivo il timer interno non basta: lì serve un cron
 esterno che chiami `POST /cron/poll` ogni 15 minuti — il workflow GitHub Actions è già pronto in
