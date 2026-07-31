@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.net.toUri
-import it.spotifystats.app.BuildConfig
+import it.spotifystats.app.data.ServerConfig
 import it.spotifystats.app.data.SessionStore
 
 /**
@@ -18,15 +18,22 @@ import it.spotifystats.app.data.SessionStore
  * potrebbe leggere le credenziali digitate. La Custom Tab usa il browser di
  * sistema, con le sue password salvate e la sua sessione.
  */
-class AuthManager(private val session: SessionStore) {
+class AuthManager(
+    private val session: SessionStore,
+    private val server: ServerConfig,
+) {
 
-    fun startLogin(context: Context) {
-        val url = "${BuildConfig.API_BASE_URL}auth/spotify/start".toUri()
+    /** false se manca l'indirizzo del backend: senza, non c'è dove andare. */
+    fun startLogin(context: Context): Boolean {
+        val base = server.currentUrl ?: return false
+
         CustomTabsIntent.Builder()
             .setShowTitle(false)
             .setUrlBarHidingEnabled(true)
             .build()
-            .launchUrl(context, url)
+            .launchUrl(context, "${base}auth/spotify/start".toUri())
+
+        return true
     }
 
     /**

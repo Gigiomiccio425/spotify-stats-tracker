@@ -99,14 +99,13 @@ login fallisce con `not_allowlisted` (vedi [SPOTIFY_SETUP.md](SPOTIFY_SETUP.md))
 
 ## Configurare l'app Android
 
-In [android/app/build.gradle.kts](../android/app/build.gradle.kts), blocco `release`:
+Niente da ricompilare: installa l'APK e al primo avvio inserisci `<DOMAIN>` nella schermata
+**Il tuo server**. L'app verifica `/health` prima di salvare.
 
-```kotlin
-buildConfigField("String", "API_BASE_URL", "\"https://<DOMAIN>/\"")
-```
-
-Con il backend in HTTPS si può togliere `android:usesCleartextTraffic="true"` dal manifest: serviva
-solo a raggiungere il server in HTTP durante lo sviluppo.
+L'APK si scarica dagli artifact della run
+[Android](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml).
+È lo stesso per tutti gli utenti: l'indirizzo del server è un'impostazione, non una costante di
+compilazione.
 
 ## Manutenzione
 

@@ -16,10 +16,12 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        // URL del backend. In emulatore 10.0.2.2 punta al localhost del PC.
-        // Su device fisico va sostituito con l'IP della macchina o col dominio
-        // pubblico, altrimenti l'app non raggiunge il server.
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8787/\"")
+        // L'indirizzo del backend NON è più una costante: lo imposta l'utente
+        // dentro l'app, perché lo stesso APK viene installato da persone che
+        // puntano a server diversi. Questo valore è solo un suggerimento
+        // precompilato nelle build di debug: 10.0.2.2 è il localhost del PC
+        // visto dall'emulatore.
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://10.0.2.2:8787/\"")
     }
 
     buildTypes {
@@ -29,7 +31,6 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            buildConfigField("String", "API_BASE_URL", "\"https://cambia-questo-dominio.example/\"")
         }
     }
 

@@ -29,6 +29,7 @@ import it.spotifystats.app.ui.history.HistoryScreen
 import it.spotifystats.app.ui.home.HomeScreen
 import it.spotifystats.app.ui.recap.RecapDetailScreen
 import it.spotifystats.app.ui.recap.RecapListScreen
+import it.spotifystats.app.ui.server.ServerSetupScreen
 import it.spotifystats.app.ui.settings.SettingsScreen
 import it.spotifystats.app.ui.theme.Accent
 import it.spotifystats.app.ui.theme.Background
@@ -109,7 +110,19 @@ fun AppNavigation(onLoggedOut: () -> Unit) {
                 RecapListScreen(onOpenRecap = { type, key -> navController.navigate("recap/$type/$key") })
             }
             composable(Destination.Settings.route) {
-                SettingsScreen(onLoggedOut = onLoggedOut)
+                SettingsScreen(
+                    onLoggedOut = onLoggedOut,
+                    onChangeServer = { navController.navigate("server") },
+                )
+            }
+
+            composable("server") {
+                ServerSetupScreen(
+                    // Cambiare server azzera la sessione: la UI torna da sola
+                    // al login, quindi qui basta chiudere la schermata.
+                    onConfigured = { navController.popBackStack() },
+                    onCancel = { navController.popBackStack() },
+                )
             }
 
             composable("track/{trackId}") { entry ->

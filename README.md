@@ -37,6 +37,8 @@ docs/        SETUP.md · SPOTIFY_SETUP.md · DEPLOY_ZIMAOS.md · ARCHITECTURE.md
 
 ## Funzioni
 
+- Indirizzo del backend configurabile **dentro l'app**: lo stesso APK vale per chiunque, ognuno
+  puntato al proprio server
 - Collegamento dell'account Spotify via OAuth (PKCE, Chrome Custom Tabs)
 - Archiviazione di ogni ascolto dal momento del collegamento, **senza limiti di retention**
 - Classifiche brani / artisti / album / generi su intervalli arbitrari

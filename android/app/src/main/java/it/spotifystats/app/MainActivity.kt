@@ -2,6 +2,7 @@ package it.spotifystats.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +19,7 @@ import it.spotifystats.app.auth.AuthOutcome
 import it.spotifystats.app.ui.components.LoadingState
 import it.spotifystats.app.ui.login.LoginScreen
 import it.spotifystats.app.ui.navigation.AppNavigation
+import it.spotifystats.app.ui.server.ServerSetupScreen
 import it.spotifystats.app.ui.theme.Background
 import it.spotifystats.app.ui.theme.SpotifyStatsTheme
 import kotlinx.coroutines.launch
@@ -25,7 +27,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private var authError by mutableStateOf<String?>(null)
-    private var sessionReady by mutableStateOf(false)
+    private var storesLoaded by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,17 +35,20 @@ class MainActivity : ComponentActivity() {
 
         val app = application as StatsApplication
 
-        // La sessione salvata va letta prima di decidere quale schermata
-        // mostrare, altrimenti l'app lampeggia sul login a ogni avvio.
+        // Indirizzo del server e sessione vanno letti prima di decidere quale
+        // schermata mostrare, altrimenti a ogni avvio l'app lampeggia sulla
+        // configurazione iniziale già fatta.
         lifecycleScope.launch {
+            app.server.load()
             app.session.load()
-            sessionReady = true
+            storesLoaded = true
         }
 
         handleDeepLink(intent)
 
         setContent {
             SpotifyStatsTheme {
+                val serverUrl by app.server.url.collectAsState(initial = null)
                 val token by app.session.token.collectAsState(initial = null)
 
                 Box(
@@ -52,14 +57,22 @@ class MainActivity : ComponentActivity() {
                         .background(Background),
                 ) {
                     when {
-                        !sessionReady -> LoadingState()
+                        !storesLoaded -> LoadingState()
+
+                        // Senza indirizzo del backend non c'è nulla da mostrare
+                        // e nemmeno dove eseguire il login.
+                        serverUrl == null -> ServerSetupScreen(onConfigured = { authError = null })
+
                         token == null -> LoginScreen(
                             onConnect = {
                                 authError = null
-                                app.auth.startLogin(this@MainActivity)
+                                if (!app.auth.startLogin(this@MainActivity)) {
+                                    authError = "Indirizzo del backend non configurato."
+                                }
                             },
                             errorMessage = authError,
                         )
+
                         else -> AppNavigation(
                             onLoggedOut = {
                                 // `session.token` emette null e la UI torna da
@@ -91,7 +104,13 @@ class MainActivity : ComponentActivity() {
             when (val outcome = app.auth.handleRedirect(data)) {
                 is AuthOutcome.Success -> {
                     authError = null
-                    sessionReady = true
+                    if (outcome.isNewAccount) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Account collegato. L'archiviazione parte da adesso.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 }
                 is AuthOutcome.Failed -> authError = outcome.message
                 null -> Unit

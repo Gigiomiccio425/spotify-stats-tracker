@@ -26,3 +26,21 @@ inline fun <reified VM : ViewModel> repositoryViewModel(
         },
     )
 }
+
+/**
+ * Variante per i ViewModel che toccano più di un pezzo del container: la
+ * configurazione del server, per esempio, va scritta insieme alla sessione.
+ */
+@Composable
+inline fun <reified VM : ViewModel> appViewModel(
+    key: String? = null,
+    crossinline create: (StatsApplication) -> VM,
+): VM {
+    val app = LocalContext.current.applicationContext as StatsApplication
+    return viewModel(
+        key = key,
+        factory = viewModelFactory {
+            initializer { create(app) }
+        },
+    )
+}

@@ -4,9 +4,9 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +22,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.spotifystats.app.StatsApplication
 import it.spotifystats.app.data.api.Me
 import it.spotifystats.app.ui.Format
 import it.spotifystats.app.ui.UiState
@@ -49,11 +51,14 @@ import it.spotifystats.app.ui.theme.TextTertiary
 import it.spotifystats.app.ui.theme.Warning
 
 @Composable
-fun SettingsScreen(onLoggedOut: () -> Unit) {
+fun SettingsScreen(onLoggedOut: () -> Unit, onChangeServer: () -> Unit) {
     val viewModel = repositoryViewModel { SettingsViewModel(it) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val loggedOut by viewModel.loggedOut.collectAsStateWithLifecycle()
+
+    val app = LocalContext.current.applicationContext as StatsApplication
+    val serverUrl by app.server.url.collectAsState(initial = app.server.currentUrl)
 
     if (loggedOut) {
         onLoggedOut()
@@ -62,8 +67,42 @@ fun SettingsScreen(onLoggedOut: () -> Unit) {
 
     when (val current = state) {
         is UiState.Loading -> LoadingState()
-        is UiState.Error -> ErrorState(current.message, onRetry = viewModel::load)
-        is UiState.Ready -> SettingsContent(current.data, viewModel, importProgress)
+        // Anche in errore la sezione del server resta raggiungibile: se
+        // l'indirizzo è sbagliato, /me fallisce, e nascondere il posto in cui
+        // correggerlo lascerebbe l'utente bloccato.
+        is UiState.Error -> Column(Modifier.fillMaxSize()) {
+            ServerSection(serverUrl, onChangeServer)
+            HorizontalDivider(color = SurfaceElevated)
+            ErrorState(current.message, onRetry = viewModel::load)
+        }
+        is UiState.Ready -> SettingsContent(
+            me = current.data,
+            viewModel = viewModel,
+            importProgress = importProgress,
+            serverUrl = serverUrl,
+            onChangeServer = onChangeServer,
+        )
+    }
+}
+
+@Composable
+private fun ServerSection(serverUrl: String?, onChangeServer: () -> Unit) {
+    SectionTitle("Server")
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            serverUrl ?: "non configurato",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (serverUrl == null) Danger else TextSecondary,
+        )
+        TextButton(onClick = onChangeServer, contentPadding = PaddingValues(0.dp)) {
+            Text("Cambia server", color = Accent)
+        }
+        Text(
+            "Cambiando server si esce dall'account: la sessione vale solo per il backend " +
+                "che l'ha rilasciata.",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextTertiary,
+        )
     }
 }
 
@@ -72,6 +111,8 @@ private fun SettingsContent(
     me: Me,
     viewModel: SettingsViewModel,
     importProgress: ImportProgress,
+    serverUrl: String?,
+    onChangeServer: () -> Unit,
 ) {
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
@@ -108,6 +149,10 @@ private fun SettingsContent(
             }
         }
 
+        HorizontalDivider(color = SurfaceElevated)
+        ServerSection(serverUrl, onChangeServer)
+
+        HorizontalDivider(color = SurfaceElevated)
         SectionTitle("Stato archiviazione")
         InfoRow("Ultimo controllo", Format.date(me.sync.lastRunAt).takeIf { me.sync.lastRunAt != null } ?: "mai")
         InfoRow("Esito", me.sync.status ?: "—")

@@ -68,19 +68,37 @@ cd backend && npm run poll
 
 ## App Android
 
+L'indirizzo del backend **non** si compila dentro l'APK: lo si inserisce nell'app al primo avvio.
+Lo stesso APK funziona quindi per chiunque, ognuno puntato al proprio server.
+
+Al primo avvio compare la schermata **Il tuo server**. Inserisci l'indirizzo:
+
+- emulatore: `http://10.0.2.2:8787` (`10.0.2.2` è il localhost del PC visto dall'emulatore;
+  nelle build di debug c'è un pulsante che lo precompila)
+- device fisico sulla stessa rete: `http://192.168.x.x:8787`
+- produzione: `stats.tuodominio.it` — senza prefisso si assume `https`
+
+L'app contatta `/health` e salva solo se il server risponde davvero. Si cambia in qualsiasi momento
+da **Profilo → Server**; cambiando indirizzo la sessione viene azzerata, perché il JWT vale solo per
+il backend che l'ha emesso.
+
+**Non servono Client ID e Secret di Spotify nell'app**: restano sul backend. Un secret dentro un APK
+è estraibile con `unzip` e un decompiler, quindi non sarebbe più un secret.
+
+Per compilare in locale:
+
 1. Apri la cartella `android/` in Android Studio (usa "Open", non "Import").
 2. Alla prima apertura Android Studio scarica il Gradle wrapper e l'SDK. Da riga di comando serve
    prima `gradle wrapper`.
-3. In [app/build.gradle.kts](../android/app/build.gradle.kts) controlla `API_BASE_URL`:
-   - emulatore: `http://10.0.2.2:8787/` (già impostato — `10.0.2.2` è il localhost del PC visto
-     dall'emulatore)
-   - device fisico sulla stessa rete: `http://<ip-del-pc>:8787/`
-   - produzione: il dominio HTTPS, da mettere nel blocco `release`
-4. Il deep link di ritorno deve combaciare con `APP_DEEP_LINK` del backend: di default
-   `spotifystats://auth`.
 
-`usesCleartextTraffic="true"` nel manifest serve solo per il backend in HTTP durante lo sviluppo.
-Va tolto prima di distribuire l'app.
+Oppure scarica l'APK già compilato dagli artifact della run
+[Android](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml).
+
+Il deep link di ritorno dall'OAuth è fisso nel manifest: `spotifystats://auth`. Deve combaciare con
+`APP_DEEP_LINK` del backend, che ha lo stesso valore di default.
+
+`usesCleartextTraffic="true"` nel manifest serve a raggiungere backend in HTTP su rete locale. Se
+usi solo HTTPS puoi toglierlo.
 
 ## Test end-to-end
 

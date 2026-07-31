@@ -2,6 +2,7 @@ package it.spotifystats.app.data
 
 import it.spotifystats.app.data.api.ApiService
 import it.spotifystats.app.data.api.ArtistDetail
+import it.spotifystats.app.data.api.BackendNotConfiguredException
 import it.spotifystats.app.data.api.ClockResponse
 import it.spotifystats.app.data.api.HistoryResponse
 import it.spotifystats.app.data.api.ImportResult
@@ -38,6 +39,11 @@ class StatsRepository(
     private suspend fun <T> call(block: suspend () -> T): Result<T> = withContext(Dispatchers.IO) {
         runCatching { block() }.recoverCatching { error ->
             when {
+                // Va riconosciuto prima di IOException, da cui deriva:
+                // altrimenti riceverebbe il messaggio generico di rete e
+                // l'utente cercherebbe un guasto che non c'è.
+                error is BackendNotConfiguredException ->
+                    throw Exception("Indirizzo del backend non configurato. Impostalo in Profilo.")
                 error is HttpException && error.code() == 401 -> {
                     session.clear()
                     throw SessionExpiredException()
