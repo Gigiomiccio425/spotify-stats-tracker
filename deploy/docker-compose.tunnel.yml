@@ -29,20 +29,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-stats}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stats} -d ${POSTGRES_DB:-stats}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+    # Nessuna healthcheck, e nessun `condition: service_healthy` sul backend:
+    # su alcuni sistemi (ZimaOS) gli exec dentro i container falliscono con
+    # "permission denied" e il database risulterebbe eternamente non sano.
+    # Ad aspettare Postgres ci pensa il backend, che riprova la connessione.
     networks: [internal]
 
   backend:
     image: ${BACKEND_IMAGE:?serve BACKEND_IMAGE nel .env}
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-stats}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stats}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
