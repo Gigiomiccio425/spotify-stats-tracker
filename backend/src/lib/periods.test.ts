@@ -56,6 +56,20 @@ describe('periodo giornaliero', () => {
     expect(day.end.toISOString()).toBe('2026-07-20T22:00:00.000Z');
   });
 
+  it('con ora di inizio 4, le due di notte appartengono al giorno prima', () => {
+    const c = { ...ctx('2026-01-01T00:00:00Z'), dayStartHour: 4 };
+
+    // 02:30 italiane del 16 luglio: la giornata "del 15" non e' ancora finita.
+    const notte = periodContaining('day', c, new Date('2026-07-16T00:30:00Z'));
+    expect(notte.start.toISOString()).toBe('2026-07-15T02:00:00.000Z'); // 15 lug 04:00
+    expect(notte.key).toBe('2026-07-15');
+
+    // 10:00 italiane dello stesso giorno: siamo gia' nella giornata del 16.
+    const mattina = periodContaining('day', c, new Date('2026-07-16T08:00:00Z'));
+    expect(mattina.start.toISOString()).toBe('2026-07-16T02:00:00.000Z');
+    expect(mattina.start.toISOString()).toBe(notte.end.toISOString());
+  });
+
   it('dura 23 ore nel giorno in cui scatta l ora legale', () => {
     const day = periodContaining('day', ctx('2026-01-01T00:00:00Z'), new Date('2026-03-29T12:00:00Z'));
     expect((day.end.getTime() - day.start.getTime()) / HOUR).toBe(23);

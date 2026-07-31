@@ -166,6 +166,12 @@ export interface PeriodContext {
   mode: PeriodMode;
   timeZone: string;
   trackingSince: Date;
+  /**
+   * Ora a cui comincia la giornata nei recap giornalieri, 0-23.
+   * Con 4, gli ascolti delle due di notte finiscono nel riepilogo della sera
+   * precedente, che è dove chi li ha fatti se li aspetta.
+   */
+  dayStartHour?: number;
 }
 
 /** Inizio del periodo di tipo `type` che contiene `instant`. */
@@ -174,8 +180,14 @@ function periodStart(instant: Date, type: PeriodType, ctx: PeriodContext): Date 
 
   // Un giorno è un giorno in entrambe le modalità: non ha senso ancorarlo
   // all'ora del collegamento, nessuno ragiona in giornate che iniziano alle
-  // 14:37.
-  if (type === 'day') return startOfLocalDay(instant, timeZone);
+  // 14:37. L'ora di inizio è però configurabile dall'utente.
+  if (type === 'day') {
+    const hour = ctx.dayStartHour ?? 0;
+    const p = zonedParts(instant, timeZone);
+    const startOfToday = zonedToUtc(timeZone, p.year, p.month, p.day, hour);
+    // Prima dell'ora di taglio si appartiene ancora alla giornata precedente.
+    return p.hour < hour ? addLocalDays(startOfToday, -1, timeZone) : startOfToday;
+  }
 
   if (mode === 'anniversary') {
     const anchor = zonedParts(trackingSince, timeZone);

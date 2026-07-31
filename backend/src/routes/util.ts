@@ -9,6 +9,7 @@ export function periodContext(user: User): PeriodContext {
     mode: user.periodMode as PeriodMode,
     timeZone: user.timezone,
     trackingSince: user.trackingSince,
+    dayStartHour: user.dailyRecapHour,
   };
 }
 

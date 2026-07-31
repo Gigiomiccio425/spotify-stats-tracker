@@ -1,4 +1,4 @@
-import { isNull, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { getAppAccessToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { albumArtists, albums, artists, trackArtists, tracks } from '../db/schema.js';
@@ -109,10 +109,23 @@ export async function upsertTracksFromSpotify(spotifyTracks: SpotifyTrack[]): Pr
  * traccia, solo per artista.
  */
 export async function enrichPendingArtists(limit = 200): Promise<number> {
+  // Due categorie insieme:
+  //  - mai arricchiti (popularity ancora NULL);
+  //  - arricchiti ma senza generi da più di una settimana.
+  // La seconda esiste perché un errore momentaneo delle credenziali
+  // applicative lasciava l'artista con `popularity = 0` e generi vuoti, e con
+  // il solo controllo su NULL non veniva più ritentato: le statistiche per
+  // genere restavano vuote per sempre. `fetched_at` viene riscritto a ogni
+  // tentativo, quindi chi davvero non ha generi su Spotify viene ricontrollato
+  // al massimo una volta a settimana.
   const pending = await db
     .select({ id: artists.id })
     .from(artists)
-    .where(isNull(artists.popularity))
+    .where(
+      sql`${artists.popularity} is null
+          or (cardinality(${artists.genres}) = 0
+              and ${artists.fetchedAt} < now() - interval '7 days')`,
+    )
     .limit(limit);
 
   if (pending.length === 0) return 0;

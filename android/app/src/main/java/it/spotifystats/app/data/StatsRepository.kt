@@ -16,9 +16,10 @@ import it.spotifystats.app.data.api.SyncResult
 import it.spotifystats.app.data.api.TimelineResponse
 import it.spotifystats.app.data.api.TopAlbum
 import it.spotifystats.app.data.api.TopArtist
-import it.spotifystats.app.data.api.TopGenre
+import it.spotifystats.app.data.api.TopGenresResponse
 import it.spotifystats.app.data.api.TopTrack
 import it.spotifystats.app.data.api.TrackDetail
+import it.spotifystats.app.data.api.WeekdaysResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -87,13 +88,15 @@ class StatsRepository(
     suspend fun topAlbums(range: String, limit: Int = 50, offset: Int = 0): Result<List<TopAlbum>> =
         call { api.topAlbums(range, limit, offset).items }
 
-    suspend fun topGenres(range: String, limit: Int = 30): Result<List<TopGenre>> =
-        call { api.topGenres(range, limit).items }
+    suspend fun topGenres(range: String, limit: Int = 30): Result<TopGenresResponse> =
+        call { api.topGenres(range, limit) }
 
     suspend fun timeline(range: String, bucket: String): Result<TimelineResponse> =
         call { api.timeline(range, bucket) }
 
     suspend fun clock(range: String): Result<ClockResponse> = call { api.clock(range) }
+
+    suspend fun weekdays(range: String): Result<WeekdaysResponse> = call { api.weekdays(range) }
 
     suspend fun releaseYears(range: String): Result<ReleaseYearStats> =
         call { api.releaseYears(range) }

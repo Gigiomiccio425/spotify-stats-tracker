@@ -30,6 +30,8 @@ data class Me(
     val trackingSince: String,
     val periodMode: String = "calendar",
     val timezone: String = "Europe/Rome",
+    /** Ora a cui comincia la giornata nei recap giornalieri, 0-23. */
+    val dailyRecapHour: Int = 0,
     val sync: SyncStatus = SyncStatus(),
 )
 
@@ -37,6 +39,7 @@ data class Me(
 data class SettingsPatch(
     val periodMode: String? = null,
     val timezone: String? = null,
+    val dailyRecapHour: Int? = null,
 )
 
 @Serializable
@@ -81,7 +84,14 @@ data class TopGenre(
 @Serializable data class TopTracksResponse(val items: List<TopTrack> = emptyList())
 @Serializable data class TopArtistsResponse(val items: List<TopArtist> = emptyList())
 @Serializable data class TopAlbumsResponse(val items: List<TopAlbum> = emptyList())
-@Serializable data class TopGenresResponse(val items: List<TopGenre> = emptyList())
+@Serializable
+data class TopGenresResponse(
+    val items: List<TopGenre> = emptyList(),
+    /** Quanti artisti ascoltati nel periodo, e quanti di questi hanno almeno un
+     *  genere su Spotify. Servono a spiegare una classifica vuota. */
+    val artistsTotal: Int = 0,
+    val artistsWithGenres: Int = 0,
+)
 
 @Serializable
 data class Overview(
@@ -124,6 +134,12 @@ data class ReleaseYearStats(
     /** Ascolti su cui il calcolo si basa: alcuni album non hanno una data. */
     val coveredPlays: Int = 0,
 )
+
+@Serializable
+data class WeekdayStat(val weekday: Int, val playCount: Int, val msPlayed: Long = 0)
+
+@Serializable
+data class WeekdaysResponse(val days: List<WeekdayStat> = emptyList())
 
 @Serializable
 data class ClockHour(val hour: Int, val playCount: Int)

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "daily_recap_hour" integer DEFAULT 0 NOT NULL;

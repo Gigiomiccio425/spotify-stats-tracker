@@ -38,7 +38,7 @@ import it.spotifystats.app.ui.top.TopScreen
 
 private sealed class Destination(val route: String, val label: String, val icon: ImageVector) {
     data object Home : Destination("home", "Home", Icons.Filled.Home)
-    data object Top : Destination("top", "Classifiche", Icons.Filled.BarChart)
+    data object Top : Destination("top", "Statistiche", Icons.Filled.BarChart)
     data object History : Destination("history", "Storico", Icons.Filled.History)
     data object Recaps : Destination("recaps", "Recap", Icons.Filled.CalendarMonth)
     data object Settings : Destination("settings", "Profilo", Icons.Filled.Person)

@@ -247,6 +247,62 @@ export async function getTimeline(
   ).map((r) => ({ ...r, playCount: Number(r.playCount), msPlayed: Number(r.msPlayed) }));
 }
 
+/** Ascolti per giorno della settimana, con lunedì = 1 come vuole lo standard ISO. */
+export async function getWeekdayStats(
+  userId: string,
+  range: Range,
+  timeZone: string,
+): Promise<{ weekday: number; playCount: number; msPlayed: number }[]> {
+  const found = await rows<{ weekday: number; playCount: number; msPlayed: number }>(sql`
+    select
+      extract(isodow from p.played_at at time zone ${timeZone})::int as weekday,
+      count(*)::int            as "playCount",
+      sum(p.ms_played)::bigint as "msPlayed"
+    from plays p
+    where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
+    group by 1
+  `);
+
+  // Sempre sette punti, anche a zero: un grafico che salta i giorni vuoti
+  // farebbe sembrare il lunedì adiacente al mercoledì.
+  const byDay = new Map(found.map((r) => [Number(r.weekday), r]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const row = byDay.get(i + 1);
+    return {
+      weekday: i + 1,
+      playCount: Number(row?.playCount ?? 0),
+      msPlayed: Number(row?.msPlayed ?? 0),
+    };
+  });
+}
+
+/**
+ * Quanti degli artisti ascoltati hanno almeno un genere.
+ *
+ * Serve a distinguere due situazioni che l'utente vedrebbe identiche: una
+ * classifica dei generi vuota perché non c'è ancora nulla in archivio, e una
+ * vuota perché Spotify non attribuisce generi a quegli artisti.
+ */
+export async function getGenreCoverage(
+  userId: string,
+  range: Range,
+): Promise<{ artistsTotal: number; artistsWithGenres: number }> {
+  const [row] = await rows<{ artistsTotal: number; artistsWithGenres: number }>(sql`
+    select
+      count(distinct a.id)::int                                              as "artistsTotal",
+      count(distinct a.id) filter (where cardinality(a.genres) > 0)::int     as "artistsWithGenres"
+    from plays p
+    join track_artists ta on ta.track_id = p.track_id
+    join artists a on a.id = ta.artist_id
+    where p.user_id = ${userId} and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
+  `);
+
+  return {
+    artistsTotal: Number(row?.artistsTotal ?? 0),
+    artistsWithGenres: Number(row?.artistsWithGenres ?? 0),
+  };
+}
+
 export interface ReleaseYearStats {
   years: { year: number; playCount: number; msPlayed: number }[];
   decades: { decade: number; playCount: number; share: number }[];

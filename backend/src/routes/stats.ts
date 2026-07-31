@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { requireAuth, type AuthedEnv } from '../middleware/auth.js';
 import {
   getArtistDetail,
+  getGenreCoverage,
   getListeningClock,
   getOverview,
   getReleaseYearStats,
@@ -13,6 +14,7 @@ import {
   getTopGenres,
   getTopTracks,
   getTrackDetail,
+  getWeekdayStats,
 } from '../lib/stats.js';
 import { intParam, resolveRange } from './util.js';
 
@@ -56,8 +58,15 @@ statsRoutes.get('/top/:kind', async (c) => {
       return c.json({ items: await getTopArtists(user.id, range, limit, offset) });
     case 'albums':
       return c.json({ items: await getTopAlbums(user.id, range, limit, offset) });
-    case 'genres':
-      return c.json({ items: await getTopGenres(user.id, range, limit) });
+    case 'genres': {
+      // La copertura viaggia insieme alla classifica: senza, una lista vuota
+      // non direbbe se manca la musica o i generi.
+      const [items, coverage] = await Promise.all([
+        getTopGenres(user.id, range, limit),
+        getGenreCoverage(user.id, range),
+      ]);
+      return c.json({ items, ...coverage });
+    }
     default:
       throw new HTTPException(404, { message: `Tipo "${kind}" sconosciuto` });
   }
@@ -83,6 +92,12 @@ statsRoutes.get('/clock', async (c) => {
  * Distribuzione degli ascolti per anno di pubblicazione, con l'anno medio
  * ponderato: quanto è "vecchia" la musica che si ascolta.
  */
+statsRoutes.get('/weekdays', async (c) => {
+  const user = c.get('user');
+  const range = resolveRange(c, user);
+  return c.json({ days: await getWeekdayStats(user.id, range, user.timezone) });
+});
+
 statsRoutes.get('/release-years', async (c) => {
   const user = c.get('user');
   return c.json(await getReleaseYearStats(user.id, resolveRange(c, user)));

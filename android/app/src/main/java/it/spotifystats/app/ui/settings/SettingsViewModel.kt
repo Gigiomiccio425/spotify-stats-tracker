@@ -60,6 +60,19 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
     }
 
     /**
+     * L'ora di inizio della giornata vive sul server, non sul telefono: così
+     * vale anche reinstallando l'app o accedendo da un altro dispositivo, ed è
+     * la stessa con cui il server calcola i recap.
+     */
+    fun setDailyRecapHour(hour: Int) {
+        val current = (_state.value as? UiState.Ready)?.data ?: return
+        viewModelScope.launch {
+            _state.value = UiState.Ready(current.copy(dailyRecapHour = hour))
+            repository.updateSettings(SettingsPatch(dailyRecapHour = hour)).onFailure { load() }
+        }
+    }
+
+    /**
      * Importa i file dell'archivio Spotify, uno per volta.
      *
      * Il parsing avviene sul telefono perché il backend riceve già JSON pronto:

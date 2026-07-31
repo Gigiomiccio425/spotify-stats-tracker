@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -22,6 +27,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -208,6 +214,27 @@ private fun SettingsContent(
         }
 
         HorizontalDivider(color = SurfaceElevated)
+        SectionTitle("Inizio della giornata")
+
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            Text(
+                "A che ora comincia una giornata nei recap giornalieri. Con le 4, gli ascolti " +
+                    "delle due di notte finiscono nel riepilogo della sera prima.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+            )
+            VerticalSpacer(12)
+            HourSelector(me.dailyRecapHour) { viewModel.setDailyRecapHour(it) }
+            VerticalSpacer(8)
+            Text(
+                "La giornata di oggi va dalle ${"%02d".format(me.dailyRecapHour)}:00 di oggi " +
+                    "alle ${"%02d".format(me.dailyRecapHour)}:00 di domani.",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+            )
+        }
+
+        HorizontalDivider(color = SurfaceElevated)
         SectionTitle("Storico precedente")
 
         Column(Modifier.padding(horizontal = 16.dp)) {
@@ -270,6 +297,46 @@ private fun SettingsContent(
             },
             containerColor = SurfaceElevated,
         )
+    }
+}
+
+/**
+ * Ventiquattro pulsanti in una riga scorrevole invece di un selettore d'orario:
+ * i minuti qui non servono, e scegliere fra 24 valori con un tocco è più rapido
+ * che aprire un dialogo.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HourSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val listState = rememberLazyListState()
+
+    // Porta in vista l'ora attiva: con 24 voci quella scelta può essere fuori
+    // schermo, e sembrerebbe che non ce ne sia nessuna.
+    LaunchedEffect(selected) {
+        listState.animateScrollToItem((selected - 2).coerceAtLeast(0))
+    }
+
+    LazyRow(
+        state = listState,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(24) { hour ->
+            FilterChip(
+                selected = hour == selected,
+                onClick = { onSelect(hour) },
+                label = {
+                    Text("%02d:00".format(hour), style = MaterialTheme.typography.labelLarge)
+                },
+                shape = RoundedCornerShape(50),
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = SurfaceElevated,
+                    labelColor = TextSecondary,
+                    selectedContainerColor = Accent,
+                    selectedLabelColor = androidx.compose.ui.graphics.Color.Black,
+                ),
+                border = null,
+            )
+        }
     }
 }
 

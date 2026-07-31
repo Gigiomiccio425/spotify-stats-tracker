@@ -25,6 +25,7 @@ accountRoutes.get('/me', async (c) => {
     trackingSince: user.trackingSince.toISOString(),
     periodMode: user.periodMode,
     timezone: user.timezone,
+    dailyRecapHour: user.dailyRecapHour,
     sync: {
       lastRunAt: last?.startedAt?.toISOString() ?? null,
       status: last?.status ?? null,
@@ -40,6 +41,7 @@ accountRoutes.get('/me', async (c) => {
 const settingsSchema = z.object({
   periodMode: z.enum(['calendar', 'anniversary']).optional(),
   timezone: z.string().min(1).optional(),
+  dailyRecapHour: z.coerce.number().int().min(0).max(23).optional(),
 });
 
 accountRoutes.patch('/me', async (c) => {
@@ -62,7 +64,11 @@ accountRoutes.patch('/me', async (c) => {
     .where(eq(users.id, user.id))
     .returning();
 
-  return c.json({ periodMode: updated!.periodMode, timezone: updated!.timezone });
+  return c.json({
+    periodMode: updated!.periodMode,
+    timezone: updated!.timezone,
+    dailyRecapHour: updated!.dailyRecapHour,
+  });
 });
 
 /**

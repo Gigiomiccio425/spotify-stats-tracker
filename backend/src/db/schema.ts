@@ -34,6 +34,12 @@ export const users = pgTable('users', {
   periodMode: text('period_mode').notNull().default('calendar'),
   /** IANA tz, usata per raggruppare gli ascolti per giorno locale. */
   timezone: text('timezone').notNull().default('Europe/Rome'),
+  /**
+   * Ora a cui comincia la "giornata" nei recap giornalieri, 0-23.
+   * Chi ascolta musica fino alle due di notte vuole che quegli ascolti
+   * finiscano nel riepilogo della sera prima, non in quello del giorno dopo.
+   */
+  dailyRecapHour: integer('daily_recap_hour').notNull().default(0),
   createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
 });

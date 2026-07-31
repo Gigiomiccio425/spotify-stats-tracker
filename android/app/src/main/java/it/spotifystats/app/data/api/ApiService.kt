@@ -65,6 +65,9 @@ interface ApiService {
     @GET("api/stats/clock")
     suspend fun clock(@Query("range") range: String): ClockResponse
 
+    @GET("api/stats/weekdays")
+    suspend fun weekdays(@Query("range") range: String): WeekdaysResponse
+
     @GET("api/stats/release-years")
     suspend fun releaseYears(@Query("range") range: String): ReleaseYearStats
 
