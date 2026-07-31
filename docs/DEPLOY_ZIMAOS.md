@@ -4,6 +4,39 @@ ZimaOS gira su Docker, quindi tutto lo stack si installa come un unico progetto
 `docker compose`. Rispetto a un host gratuito è nettamente meglio: il servizio non viene mai
 sospeso, quindi il poller può girare **dentro il processo** e non serve alcun cron esterno.
 
+## Se le porte 80 e 443 sono già occupate
+
+Su ZimaOS di solito lo sono: le usa la dashboard. Verifica chi le tiene:
+
+```bash
+sudo ss -tlnp | grep -E ':(80|443) '
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E ':(80|443)->'
+```
+
+Due strade.
+
+**Tunnel Cloudflare — nessuna porta da aprire.** Il container `cloudflared` apre una connessione in
+*uscita* verso Cloudflare, che espone il backend su `https://<DOMAIN>` e ci mette il certificato.
+Niente porte in ingresso, niente record A, niente Let's Encrypt: funziona anche dietro CGNAT.
+Richiede che il dominio sia gestito da Cloudflare, piano gratuito. Usa
+[deploy/docker-compose.tunnel.yml](../deploy/docker-compose.tunnel.yml), che non contiene affatto
+Caddy.
+
+```bash
+# Zero Trust > Networks > Tunnels > Create a tunnel > Cloudflared
+# Public Hostname:  <DOMAIN>  ->  HTTP  ->  backend:8787
+# Copia il token in .env come CLOUDFLARE_TUNNEL_TOKEN
+docker compose -f docker-compose.tunnel.yml up -d
+```
+
+**Spostare la dashboard di ZimaOS su un'altra porta**, liberando 80 e 443 per Caddy. Tiene lo stack
+standard, ma se sbagli qualcosa perdi l'accesso all'interfaccia da cui stai lavorando: fallo solo
+con accesso SSH funzionante.
+
+Nota sul tunnel: il piano gratuito di Cloudflare limita il corpo delle richieste a 100 MB. I file
+dell'archivio *Extended Streaming History* stanno di solito sotto i 30 MB, ma se ne hai uno più
+grande dividilo prima di caricarlo.
+
 ## Cosa serve prima
 
 - **Un dominio che punta all'IP della VPS** (record A). Serve davvero: Spotify accetta come Redirect

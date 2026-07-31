@@ -1,0 +1,76 @@
+# Variante senza Caddy e senza porte pubblicate.
+#
+# Serve quando 80 e 443 sono gia' occupate — su ZimaOS le usa la dashboard —
+# oppure quando la macchina e' dietro CGNAT e non ha un IP pubblico.
+#
+# Cloudflare Tunnel apre una connessione in USCITA verso Cloudflare, che
+# espone il backend su https://<DOMAIN> e ci mette il certificato. Nessuna
+# porta in ingresso, nessun record A da configurare, niente Let's Encrypt.
+#
+# Preparazione (una volta sola):
+#   1. Il dominio dev'essere gestito da Cloudflare (piano gratuito).
+#   2. Zero Trust -> Networks -> Tunnels -> Create a tunnel -> Cloudflared.
+#   3. Copia il token e mettilo in .env come CLOUDFLARE_TUNNEL_TOKEN.
+#   4. Nel tunnel aggiungi una Public Hostname:
+#        Subdomain/Domain: il tuo <DOMAIN>
+#        Service: HTTP -> backend:8787
+#
+# Avvio:  docker compose -f docker-compose.tunnel.yml up -d
+
+name: spotify-stats
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stats}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?serve POSTGRES_PASSWORD nel .env}
+      POSTGRES_DB: ${POSTGRES_DB:-stats}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stats} -d ${POSTGRES_DB:-stats}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  backend:
+    image: ${BACKEND_IMAGE:?serve BACKEND_IMAGE nel .env}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stats}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stats}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      # Il certificato lo mette Cloudflare: verso l'esterno resta HTTPS, ed e'
+      # quello che Spotify controlla nel Redirect URI.
+      SPOTIFY_REDIRECT_URI: https://${DOMAIN}/auth/spotify/callback
+      APP_BASE_URL: https://${DOMAIN}
+      APP_DEEP_LINK: ${APP_DEEP_LINK:-spotifystats://auth}
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_ENC_KEY: ${TOKEN_ENC_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      ENABLE_INTERNAL_CRON: "true"
+      POLL_INTERVAL_MINUTES: ${POLL_INTERVAL_MINUTES:-15}
+      PORT: "8787"
+    networks: [internal, web]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # Nessuna sezione `ports`: la connessione parte da qui verso Cloudflare.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?serve CLOUDFLARE_TUNNEL_TOKEN nel .env}
+    networks: [web]
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+  web:
