@@ -22,6 +22,23 @@ fail() { printf '\033[31m%s\033[0m\n' "$1" >&2; exit 1; }
 
 command -v docker >/dev/null 2>&1 || fail "Docker non trovato. Serve Docker per procedere."
 
+# Verificato subito, prima di generare segreti e scrivere file: scoprire di
+# non poter parlare col daemon a meta' installazione lascia in giro un .env
+# gia' compilato e un lavoro da rifare.
+if ! docker info >/dev/null 2>&1; then
+  printf '\033[31m%s\033[0m\n' "Non riesco a contattare il daemon Docker." >&2
+  echo >&2
+  echo "L'utente '$(id -un)' non ha accesso a /var/run/docker.sock. Due modi:" >&2
+  echo >&2
+  echo "  sudo bash $0" >&2
+  echo >&2
+  echo "oppure, una volta sola, per non dover usare sudo ogni volta:" >&2
+  echo >&2
+  echo "  sudo usermod -aG docker $(id -un)" >&2
+  echo "  # poi esci e rientra nella sessione, o esegui: newgrp docker" >&2
+  exit 1
+fi
+
 if docker compose version >/dev/null 2>&1; then
   DC="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -55,17 +72,38 @@ random_alnum() {
 bold "Configurazione"
 echo
 
+# Se un .env c'e' gia', l'impostazione predefinita e' tenerlo e proseguire:
+# quasi sempre si rilancia lo script dopo un errore, e rigenerare i segreti a
+# ogni tentativo scollegherebbe gli account gia' associati.
+REUSE_ENV=""
 if [ -f .env ]; then
   warn "Esiste gia' un file .env in questa cartella."
-  read -r -p "Sovrascriverlo? I segreti attuali andranno persi. [s/N] " overwrite
-  case "$overwrite" in
-    s|S|y|Y) ;;
-    *) echo "Interrotto. Il .env esistente non e' stato toccato."; exit 0 ;;
+  echo
+  echo "  1) Tenerlo e proseguire con l'avvio dello stack  (predefinito)"
+  echo "  2) Rigenerarlo da zero"
+  echo
+  read -r -p "Scelta [1/2]: " env_choice
+  case "$env_choice" in
+    2)
+      warn "Con una TOKEN_ENC_KEY nuova gli account gia' collegati dovranno rifare il login."
+      read -r -p "Confermi? [s/N] " confirm
+      case "$confirm" in
+        s|S|y|Y) ;;
+        *) echo "Interrotto."; exit 0 ;;
+      esac
+      ;;
+    *)
+      REUSE_ENV="si"
+      echo "Uso il .env esistente."
+      ;;
   esac
-  # Cambiare TOKEN_ENC_KEY rende indecifrabili i refresh token gia' salvati.
-  warn "Nota: con una TOKEN_ENC_KEY nuova gli account collegati dovranno rifare il login."
   echo
 fi
+
+if [ -n "$REUSE_ENV" ]; then
+  # Serve solo per il messaggio finale.
+  DOMAIN="$(grep -E '^DOMAIN=' .env | head -n1 | cut -d= -f2-)"
+else
 
 echo "Il dominio deve gia' puntare all'IP di questa macchina (record A)."
 echo "Spotify accetta redirect URI solo in HTTPS, quindi un IP nudo non basta."
@@ -136,6 +174,8 @@ POLL_INTERVAL_MINUTES=15
 EOF
 
 chmod 600 .env
+
+fi   # fine del ramo "genera un .env nuovo"
 
 echo "Scarico i file dello stack…"
 $DOWNLOAD "$COMPOSE_FILE" "${REPO_RAW}/${COMPOSE_FILE}"
