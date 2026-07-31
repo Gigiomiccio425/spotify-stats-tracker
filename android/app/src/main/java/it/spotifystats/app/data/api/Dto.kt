@@ -194,9 +194,19 @@ data class RecapGroup(
 )
 
 @Serializable
+data class ArchiveBounds(
+    val firstPlayAt: String? = null,
+    val lastPlayAt: String? = null,
+    val totalPlays: Int = 0,
+    /** Ascolti provenienti dall'archivio Spotify caricato dall'utente. */
+    val importedPlays: Int = 0,
+)
+
+@Serializable
 data class RecapListResponse(
     val mode: String = "calendar",
     val trackingSince: String,
+    val archive: ArchiveBounds = ArchiveBounds(),
     val groups: List<RecapGroup> = emptyList(),
 )
 

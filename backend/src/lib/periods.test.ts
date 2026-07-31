@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   listCompletedPeriods,
   periodContaining,
+  periodFromKey,
   presetRange,
   startOfLocalDay,
   zonedToUtc,
@@ -179,6 +180,43 @@ describe('listCompletedPeriods', () => {
   it('non restituisce nulla se nessun periodo si è ancora chiuso', () => {
     const fresh = ctx('2026-02-09T00:00:00Z');
     expect(listCompletedPeriods('month', fresh, now)).toEqual([]);
+  });
+});
+
+describe('periodFromKey', () => {
+  const c = ctx('2026-01-01T00:00:00Z');
+
+  it('ricostruisce ogni tipo dalla propria chiave', () => {
+    expect(periodFromKey('day', '2026-07-15', c)?.start.toISOString())
+      .toBe('2026-07-14T22:00:00.000Z');
+    expect(periodFromKey('week', '2026-W29', c)?.start.toISOString())
+      .toBe('2026-07-12T22:00:00.000Z');
+    expect(periodFromKey('month', '2026-02', c)?.start.toISOString())
+      .toBe('2026-01-31T23:00:00.000Z');
+    expect(periodFromKey('year', '2026', c)?.start.toISOString())
+      .toBe('2025-12-31T23:00:00.000Z');
+  });
+
+  it('risolve periodi molto anteriori al collegamento', () => {
+    // E' il caso dell'archivio Spotify importato: senza, i recap storici non
+    // sarebbero apribili.
+    const old = periodFromKey('month', '2014-03', c)
+    expect(old?.start.toISOString()).toBe('2014-02-28T23:00:00.000Z');
+    expect(old?.label).toBe('marzo 2014');
+  });
+
+  it('rifiuta chiavi mal formate o del tipo sbagliato', () => {
+    expect(periodFromKey('month', '2026-W29', c)).toBeNull();
+    expect(periodFromKey('day', 'domani', c)).toBeNull();
+    expect(periodFromKey('year', '2026-07', c)).toBeNull();
+  });
+
+  it('in modalità anniversario accetta solo le date che sono davvero confini', () => {
+    const anniversary = ctx('2026-01-10T00:00:00Z', 'anniversary');
+    expect(periodFromKey('month', '2026-03-10', anniversary)?.start.toISOString())
+      .toBe('2026-03-09T23:00:00.000Z');
+    // L'11 non e' l'inizio di nessun periodo mensile con ancoraggio al 10.
+    expect(periodFromKey('month', '2026-03-11', anniversary)).toBeNull();
   });
 });
 

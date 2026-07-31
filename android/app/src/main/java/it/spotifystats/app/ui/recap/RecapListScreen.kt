@@ -78,11 +78,24 @@ fun RecapListScreen(onOpenRecap: (type: String, key: String) -> Unit) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Recap", style = MaterialTheme.typography.headlineLarge)
                         Text(
-                            "Dal ${Format.date(data.trackingSince)} · modalità " +
+                            // La data di partenza è quella del primo ascolto in
+                            // archivio, non del collegamento: con l'archivio
+                            // Spotify importato può essere di anni prima.
+                            "Dal ${Format.date(data.archive.firstPlayAt ?: data.trackingSince)} " +
+                                "· modalità " +
                                 if (data.mode == "anniversary") "anniversario" else "calendario",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
                         )
+                        if (data.archive.importedPlays > 0) {
+                            Text(
+                                "Include ${Format.number(data.archive.importedPlays)} ascolti " +
+                                    "dall'archivio Spotify che hai caricato.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Accent,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
                 }
 
@@ -95,8 +108,10 @@ fun RecapListScreen(onOpenRecap: (type: String, key: String) -> Unit) {
                     item {
                         EmptyState(
                             title = "Nessun periodo ancora concluso",
-                            subtitle = "Un recap si genera quando il periodo è finito. " +
-                                "Il primo arriva domani, con il riepilogo di oggi.",
+                            subtitle = "Un recap si genera quando il periodo è finito e contiene " +
+                                "almeno un ascolto. Il primo arriva domani, con il riepilogo di " +
+                                "oggi. Caricando l'archivio Spotify da Profilo compaiono anche " +
+                                "quelli degli anni passati.",
                         )
                     }
                 }

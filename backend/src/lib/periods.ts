@@ -307,14 +307,21 @@ export function listCompletedPeriods(
   ctx: PeriodContext,
   now = new Date(),
   limit = 60,
+  /**
+   * Da dove iniziare a enumerare. Di norma è il collegamento dell'account, ma
+   * dopo l'import dell'archivio Spotify ci sono ascolti di anni prima, e i
+   * recap devono poterli coprire.
+   */
+  since: Date = ctx.trackingSince,
 ): Period[] {
   const out: Period[] = [];
-  let cursor = periodStart(ctx.trackingSince, type, ctx);
+  let cursor = periodStart(since, type, ctx);
   const currentStart = periodStart(now, type, ctx).getTime();
 
   // Limite di sicurezza: impedisce un ciclo infinito se il calcolo del periodo
-  // successivo non avanzasse per un bug sui confini.
-  for (let guard = 0; guard < 5000; guard++) {
+  // successivo non avanzasse per un bug sui confini. Alzato a ventimila per
+  // reggere decenni di giornate importate dall'archivio Spotify.
+  for (let guard = 0; guard < 20000; guard++) {
     if (cursor.getTime() >= currentStart) break;
     const period = buildPeriod(cursor, type, ctx);
     out.push(period);
@@ -325,15 +332,68 @@ export function listCompletedPeriods(
   return out.reverse().slice(0, limit);
 }
 
-/** Ricostruisce un periodo dalla sua `key`, per servire le URL dei recap. */
+/**
+ * Ricostruisce un periodo dalla sua `key`, per servire le URL dei recap.
+ *
+ * Ricava l'istante direttamente dalla chiave invece di scorrere l'elenco dei
+ * periodi: con anni di storico importato quella scansione costava migliaia di
+ * iterazioni a ogni apertura di un recap, e oltre il limite di sicurezza le
+ * chiavi più vecchie non si risolvevano più.
+ *
+ * L'istante scelto è a metà del periodo, non al suo inizio: sui confini un
+ * cambio di ora legale o un'ora di inizio giornata personalizzata potrebbero
+ * far ricadere il calcolo nel periodo adiacente.
+ */
 export function periodFromKey(type: PeriodType, key: string, ctx: PeriodContext): Period | null {
-  const period = listCompletedPeriods(type, ctx, new Date(), Number.MAX_SAFE_INTEGER).find(
-    (p) => p.key === key,
-  );
-  if (period) return period;
+  const anchor = anchorFromKey(type, key, ctx);
+  if (!anchor) return null;
 
-  const current = periodContaining(type, ctx);
-  return current.key === key ? current : null;
+  const period = periodContaining(type, ctx, anchor);
+  // La chiave ricostruita deve combaciare: è ciò che scarta le chiavi
+  // sintatticamente valide ma che non corrispondono a un periodo reale, come
+  // un lunedì richiesto in modalità anniversario.
+  return period.key === key ? period : null;
+}
+
+function anchorFromKey(type: PeriodType, key: string, ctx: PeriodContext): Date | null {
+  const { timeZone } = ctx;
+
+  const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (isoDate) {
+    const [, y, m, d] = isoDate;
+    // Mezzogiorno: lontano da qualsiasi confine di giornata.
+    return zonedToUtc(timeZone, Number(y), Number(m), Number(d), 12);
+  }
+
+  const isoWeek = /^(\d{4})-W(\d{2})$/.exec(key);
+  if (isoWeek && type === 'week') {
+    const [, y, w] = isoWeek;
+    // Il 4 gennaio cade sempre nella settimana ISO 1, per definizione.
+    const jan4 = new Date(Date.UTC(Number(y), 0, 4));
+    const mondayOfWeek1 = new Date(jan4);
+    mondayOfWeek1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+    const target = new Date(mondayOfWeek1);
+    target.setUTCDate(mondayOfWeek1.getUTCDate() + (Number(w) - 1) * 7 + 3);
+    return zonedToUtc(
+      timeZone,
+      target.getUTCFullYear(),
+      target.getUTCMonth() + 1,
+      target.getUTCDate(),
+      12,
+    );
+  }
+
+  const month = /^(\d{4})-(\d{2})$/.exec(key);
+  if (month && type === 'month') {
+    return zonedToUtc(timeZone, Number(month[1]), Number(month[2]), 15, 12);
+  }
+
+  const year = /^(\d{4})$/.exec(key);
+  if (year && type === 'year') {
+    return zonedToUtc(timeZone, Number(year[1]), 7, 1, 12);
+  }
+
+  return null;
 }
 
 /** Finestre relative usate dai filtri rapidi della schermata Top. */

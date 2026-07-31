@@ -285,6 +285,14 @@ private fun SettingsContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
             )
+            VerticalSpacer(6)
+            Text(
+                "A caricamento riuscito compaiono anche i recap dei periodi passati, fino al " +
+                    "primo ascolto dell'archivio: settimane, mesi e anni di prima che collegassi " +
+                    "l'account.",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+            )
             VerticalSpacer(8)
             TextButton(
                 onClick = { filePicker.launch(arrayOf("application/json", "text/plain", "*/*")) },

@@ -247,6 +247,56 @@ export async function getTimeline(
   ).map((r) => ({ ...r, playCount: Number(r.playCount), msPlayed: Number(r.msPlayed) }));
 }
 
+export interface ArchiveBounds {
+  firstPlayAt: string | null;
+  lastPlayAt: string | null;
+  totalPlays: number;
+  /** Ascolti provenienti dall'archivio Spotify caricato dall'utente. */
+  importedPlays: number;
+}
+
+/**
+ * Estremi dell'archivio. Servono a sapere fin dove i recap possono spingersi
+ * indietro: dopo l'import dell'archivio Spotify ci sono ascolti di anni prima
+ * del collegamento dell'account.
+ */
+export async function getArchiveBounds(userId: string): Promise<ArchiveBounds> {
+  const [row] = await rows<ArchiveBounds>(sql`
+    select
+      min(p.played_at)                                        as "firstPlayAt",
+      max(p.played_at)                                        as "lastPlayAt",
+      count(*)::int                                           as "totalPlays",
+      count(*) filter (where p.source = 'import')::int         as "importedPlays"
+    from plays p
+    where p.user_id = ${userId}
+  `);
+
+  return {
+    firstPlayAt: row?.firstPlayAt ?? null,
+    lastPlayAt: row?.lastPlayAt ?? null,
+    totalPlays: Number(row?.totalPlays ?? 0),
+    importedPlays: Number(row?.importedPlays ?? 0),
+  };
+}
+
+/**
+ * Giorni locali in cui c'è almeno un ascolto.
+ *
+ * Servono a non proporre recap di periodi vuoti: dopo un import l'archivio può
+ * coprire anni, ma con buchi di mesi, e un elenco di settimane senza nulla
+ * dentro sarebbe solo rumore. Anche dieci anni di ascolto quotidiano stanno in
+ * poche migliaia di righe, quindi si possono caricare tutte in una volta.
+ */
+export async function getActiveDays(userId: string, timeZone: string): Promise<string[]> {
+  const found = await rows<{ day: string }>(sql`
+    select distinct to_char((p.played_at at time zone ${timeZone})::date, 'YYYY-MM-DD') as day
+    from plays p
+    where p.user_id = ${userId}
+    order by day asc
+  `);
+  return found.map((r) => r.day);
+}
+
 /** Ascolti per giorno della settimana, con lunedì = 1 come vuole lo standard ISO. */
 export async function getWeekdayStats(
   userId: string,
