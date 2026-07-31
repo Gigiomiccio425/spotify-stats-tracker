@@ -1,8 +1,11 @@
 # Variante che usa l'immagine già compilata su GitHub Container Registry
 # invece di compilarla sulla VPS.
 #
-# È anche l'unica versione importabile dall'interfaccia di ZimaOS, che gestisce
-# `image:` ma non `build:`.
+# Va lanciata da terminale, non importata dalla finestra "app personalizzata"
+# di ZimaOS: quella non sostituisce le variabili `${...}` perche' non ha un
+# .env da cui leggerle, e fallisce con "Impossibile salvare l'app
+# personalizzata". Per ottenere un YAML gia' risolto da incollare li':
+#   docker compose -f docker-compose.ghcr.yml --env-file .env config
 #
 # Prima di usarla serve che il workflow "Immagine backend" abbia pubblicato
 # almeno una volta, e che il package su GitHub sia pubblico (Packages →

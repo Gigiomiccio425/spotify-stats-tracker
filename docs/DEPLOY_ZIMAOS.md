@@ -50,13 +50,30 @@ grande dividilo prima di caricarlo.
 **A — immagine già compilata (consigliata).** GitHub Actions compila il backend a ogni push e
 pubblica l'immagine su `ghcr.io/gigiomiccio425/spotify-stats-tracker/backend:latest`. La VPS la
 scarica e basta: niente compilazione sulla macchina, aggiornamenti in pochi secondi. Usa
-[deploy/docker-compose.ghcr.yml](../deploy/docker-compose.ghcr.yml), che è anche l'unica variante
-importabile dall'interfaccia di ZimaOS (gestisce `image:` ma non `build:`).
+[deploy/docker-compose.ghcr.yml](../deploy/docker-compose.ghcr.yml).
 
 **B — compilazione sulla VPS.** Con [deploy/docker-compose.yml](../deploy/docker-compose.yml).
 Serve se hai modifiche locali non ancora spinte su GitHub. Va lanciata da SSH.
 
 Il resto della procedura è identico: cambia solo il file compose.
+
+## Non usare la finestra "app personalizzata"
+
+L'importer di app personalizzate della dashboard **non** sostituisce le variabili `${...}`: non ha
+un `.env` da cui leggerle. Incollandoci un compose di questo progetto risponde *Impossibile salvare
+l'app personalizzata*.
+
+Va installato da terminale. Se proprio vuoi vederlo nella dashboard, parti dal compose già risolto:
+
+```bash
+docker compose -f docker-compose.ghcr.yml --env-file .env config
+```
+
+Stampa lo stesso stack con tutti i valori sostituiti, incollabile nella finestra. Attenzione: quel
+testo contiene il Client Secret e la password del database in chiaro.
+
+Non serve comunque: dopo `docker compose up -d` i container compaiono lo stesso nella dashboard di
+ZimaOS e si gestiscono da lì.
 
 ## Installazione
 
