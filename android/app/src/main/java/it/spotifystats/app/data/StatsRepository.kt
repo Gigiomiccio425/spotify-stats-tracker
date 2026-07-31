@@ -10,6 +10,7 @@ import it.spotifystats.app.data.api.Me
 import it.spotifystats.app.data.api.Overview
 import it.spotifystats.app.data.api.Recap
 import it.spotifystats.app.data.api.RecapListResponse
+import it.spotifystats.app.data.api.ReleaseYearStats
 import it.spotifystats.app.data.api.SettingsPatch
 import it.spotifystats.app.data.api.SyncResult
 import it.spotifystats.app.data.api.TimelineResponse
@@ -93,6 +94,9 @@ class StatsRepository(
         call { api.timeline(range, bucket) }
 
     suspend fun clock(range: String): Result<ClockResponse> = call { api.clock(range) }
+
+    suspend fun releaseYears(range: String): Result<ReleaseYearStats> =
+        call { api.releaseYears(range) }
 
     suspend fun history(cursor: String?, limit: Int = 50): Result<HistoryResponse> =
         call { api.history(cursor, limit) }

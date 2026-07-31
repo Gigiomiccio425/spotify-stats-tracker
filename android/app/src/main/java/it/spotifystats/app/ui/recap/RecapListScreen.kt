@@ -66,8 +66,8 @@ fun RecapListScreen(onOpenRecap: (type: String, key: String) -> Unit) {
                     item {
                         EmptyState(
                             title = "Nessun periodo ancora concluso",
-                            subtitle = "Un recap si genera quando la settimana, il mese o l'anno " +
-                                "sono finiti. Il primo arriverà a fine settimana.",
+                            subtitle = "Un recap si genera quando il periodo è finito. " +
+                                "Il primo arriva domani, con il riepilogo di oggi.",
                         )
                     }
                 }
@@ -88,6 +88,7 @@ fun RecapListScreen(onOpenRecap: (type: String, key: String) -> Unit) {
 }
 
 private fun titleFor(group: RecapGroup): String = when (group.type) {
+    "day" -> "Giorni"
     "week" -> "Settimane"
     "month" -> "Mesi"
     else -> "Anni"

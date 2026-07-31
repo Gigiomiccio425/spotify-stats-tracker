@@ -13,7 +13,7 @@
  *                  blocchi di 7 giorni, mesi e anni che scattano in quel giorno.
  */
 
-export type PeriodType = 'week' | 'month' | 'year';
+export type PeriodType = 'day' | 'week' | 'month' | 'year';
 export type PeriodMode = 'calendar' | 'anniversary';
 
 export interface Period {
@@ -172,6 +172,11 @@ export interface PeriodContext {
 function periodStart(instant: Date, type: PeriodType, ctx: PeriodContext): Date {
   const { timeZone, mode, trackingSince } = ctx;
 
+  // Un giorno è un giorno in entrambe le modalità: non ha senso ancorarlo
+  // all'ora del collegamento, nessuno ragiona in giornate che iniziano alle
+  // 14:37.
+  if (type === 'day') return startOfLocalDay(instant, timeZone);
+
   if (mode === 'anniversary') {
     const anchor = zonedParts(trackingSince, timeZone);
 
@@ -219,6 +224,7 @@ function periodStart(instant: Date, type: PeriodType, ctx: PeriodContext): Date 
 function periodEnd(start: Date, type: PeriodType, ctx: PeriodContext): Date {
   const { timeZone, mode, trackingSince } = ctx;
 
+  if (type === 'day') return addLocalDays(start, 1, timeZone);
   if (type === 'week') return addLocalDays(start, 7, timeZone);
 
   const p = zonedParts(start, timeZone);
@@ -249,7 +255,10 @@ function buildPeriod(start: Date, type: PeriodType, ctx: PeriodContext): Period 
   let key: string;
   let label: string;
 
-  if (type === 'week') {
+  if (type === 'day') {
+    key = `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+    label = `${p.day} ${MONTHS[p.month - 1]} ${p.year}`;
+  } else if (type === 'week') {
     if (ctx.mode === 'calendar') {
       const { year, week } = isoWeekNumber(start, ctx.timeZone);
       key = `${year}-W${pad(week)}`;

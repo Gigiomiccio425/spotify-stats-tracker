@@ -131,15 +131,19 @@ fun EmptyState(title: String, subtitle: String, modifier: Modifier = Modifier) {
 /** Un intervallo temporale selezionabile, con l'etichetta mostrata all'utente. */
 data class RangeOption(val value: String, val label: String)
 
+/**
+ * Niente voce "Dall'inizio": ora che il poller allinea la data di inizio al
+ * più vecchio ascolto archiviato, dava gli stessi numeri di "Tutto" e faceva
+ * solo dubitare di quale delle due fosse quella giusta.
+ */
 val DefaultRanges = listOf(
     RangeOption("week", "Settimana"),
     RangeOption("month", "Mese"),
     RangeOption("4weeks", "4 settimane"),
     RangeOption("6months", "6 mesi"),
     RangeOption("year", "Anno"),
-    RangeOption("since_tracking", "Dall'inizio"),
-    // Include anche gli ascolti importati dall'archivio Spotify, che sono
-    // precedenti al collegamento dell'account.
+    // Include anche gli ascolti importati dall'archivio Spotify, precedenti al
+    // collegamento dell'account.
     RangeOption("lifetime", "Tutto"),
 )
 

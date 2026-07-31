@@ -1,13 +1,20 @@
 package it.spotifystats.app.ui.recap
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,6 +23,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,10 +34,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -43,12 +57,15 @@ import it.spotifystats.app.ui.UiState
 import it.spotifystats.app.ui.components.ErrorState
 import it.spotifystats.app.ui.components.LoadingState
 import it.spotifystats.app.ui.components.MiniTile
+import it.spotifystats.app.ui.components.MusicalAgePanel
 import it.spotifystats.app.ui.components.SectionTitle
 import it.spotifystats.app.ui.components.TrackRow
 import it.spotifystats.app.ui.components.VerticalSpacer
 import it.spotifystats.app.ui.repositoryViewModel
 import it.spotifystats.app.ui.theme.Accent
 import it.spotifystats.app.ui.theme.Background
+import it.spotifystats.app.ui.theme.SurfaceElevated
+import it.spotifystats.app.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,9 +107,12 @@ private fun RecapContent(recap: Recap, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var style by remember { mutableStateOf(DefaultCardStyle) }
+    var format by remember { mutableStateOf(CardFormat.Story) }
+
     // Registra ciò che viene disegnato: l'immagine condivisa è esattamente la
-    // card che l'utente sta guardando, non una seconda versione da tenere
-    // allineata a mano.
+    // card che l'utente sta guardando, con lo stile e il formato scelti, non
+    // una seconda versione da tenere allineata a mano.
     val graphicsLayer = rememberGraphicsLayer()
 
     Column(
@@ -109,8 +129,13 @@ private fun RecapContent(recap: Recap, modifier: Modifier = Modifier) {
                     drawLayer(graphicsLayer)
                 },
         ) {
-            ShareCard(recap)
+            ShareCard(recap, style = style, format = format)
         }
+
+        FormatSelector(format) { format = it }
+        VerticalSpacer(12)
+        StyleSelector(style) { style = it }
+        VerticalSpacer(16)
 
         Button(
             onClick = {
@@ -119,7 +144,9 @@ private fun RecapContent(recap: Recap, modifier: Modifier = Modifier) {
                     val file = ShareCardRenderer.writePng(
                         context = context,
                         bitmap = bitmap,
-                        filename = "recap-${recap.period.type}-${recap.period.key}.png",
+                        filename = "recap-${recap.period.type}-${recap.period.key}-${style.id}.png",
+                        targetWidth = format.width,
+                        targetHeight = format.height,
                     )
                     ShareCardRenderer.share(
                         context = context,
@@ -151,6 +178,14 @@ private fun RecapContent(recap: Recap, modifier: Modifier = Modifier) {
             MiniTile("${recap.totals.listeningDays}", "giorni")
         }
 
+        // Presente solo nei recap mensili e annuali: il server non la calcola
+        // sulle finestre brevi, dove sarebbe basata su troppi pochi ascolti.
+        recap.releaseYears?.let { years ->
+            VerticalSpacer(16)
+            SectionTitle("Età musicale")
+            MusicalAgePanel(years)
+        }
+
         if (recap.topTracks.isNotEmpty()) {
             VerticalSpacer(16)
             SectionTitle("Brani più ascoltati")
@@ -165,11 +200,82 @@ private fun RecapContent(recap: Recap, modifier: Modifier = Modifier) {
             Text(
                 recap.topGenres.joinToString(" · ") { it.genre },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TextSecondary,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
 
         VerticalSpacer(48)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormatSelector(selected: CardFormat, onSelect: (CardFormat) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CardFormat.entries.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(option.label, style = MaterialTheme.typography.labelLarge) },
+                shape = RoundedCornerShape(50),
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = SurfaceElevated,
+                    labelColor = TextSecondary,
+                    selectedContainerColor = Accent,
+                    selectedLabelColor = Color.Black,
+                ),
+                border = null,
+            )
+        }
+    }
+}
+
+/**
+ * Ogni stile è rappresentato dal suo stesso gradiente: un elenco di nomi non
+ * direbbe nulla su come verrà l'immagine.
+ */
+@Composable
+private fun StyleSelector(selected: CardStyle, onSelect: (CardStyle) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(CardStyles.size) { index ->
+            val style = CardStyles[index]
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Brush.verticalGradient(style.background))
+                        .border(
+                            width = if (style.id == selected.id) 3.dp else 1.dp,
+                            color = if (style.id == selected.id) Accent else SurfaceElevated,
+                            shape = CircleShape,
+                        )
+                        .clickable { onSelect(style) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(style.accent),
+                    )
+                }
+                Text(
+                    style.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (style.id == selected.id) Accent else TextSecondary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
 }

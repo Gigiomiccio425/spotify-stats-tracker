@@ -30,6 +30,7 @@ import it.spotifystats.app.ui.components.EmptyState
 import it.spotifystats.app.ui.components.ErrorState
 import it.spotifystats.app.ui.components.GenreRow
 import it.spotifystats.app.ui.components.LoadingState
+import it.spotifystats.app.ui.components.MusicalAgePanel
 import it.spotifystats.app.ui.components.RangeSelector
 import it.spotifystats.app.ui.components.Refreshable
 import it.spotifystats.app.ui.components.TrackRow
@@ -51,7 +52,7 @@ fun TopScreen(
     // La scheda e il selettore di periodo restano visibili anche durante il
     // caricamento: sparire e ricomparire a ogni cambio è disorientante.
     val currentTab = (state as? UiState.Ready)?.data?.tab ?: TopTab.Tracks
-    val currentRange = (state as? UiState.Ready)?.data?.range ?: "since_tracking"
+    val currentRange = (state as? UiState.Ready)?.data?.range ?: "lifetime"
 
     Column(Modifier.fillMaxSize()) {
         ScrollableTabRow(
@@ -108,6 +109,7 @@ private fun TopList(
         TopTab.Artists -> data.artists.isEmpty()
         TopTab.Albums -> data.albums.isEmpty()
         TopTab.Genres -> data.genres.isEmpty()
+        TopTab.Years -> data.releaseYears == null
     }
 
     if (isEmpty) {
@@ -147,6 +149,9 @@ private fun TopList(
                 itemsIndexed(data.genres, key = { _, g -> g.genre }) { index, genre ->
                     GenreRow(genre, position = index + 1, maxPlayCount = max)
                 }
+            }
+            TopTab.Years -> item {
+                data.releaseYears?.let { MusicalAgePanel(it) }
             }
         }
 

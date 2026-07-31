@@ -65,6 +65,9 @@ interface ApiService {
     @GET("api/stats/clock")
     suspend fun clock(@Query("range") range: String): ClockResponse
 
+    @GET("api/stats/release-years")
+    suspend fun releaseYears(@Query("range") range: String): ReleaseYearStats
+
     @GET("api/stats/track/{id}")
     suspend fun trackDetail(@Path("id") id: String): TrackDetail
 

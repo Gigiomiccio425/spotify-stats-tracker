@@ -107,6 +107,25 @@ data class TimelinePoint(val bucket: String, val playCount: Int, val msPlayed: L
 data class TimelineResponse(val points: List<TimelinePoint> = emptyList())
 
 @Serializable
+data class ReleaseYear(val year: Int, val playCount: Int, val msPlayed: Long = 0)
+
+@Serializable
+data class Decade(val decade: Int, val playCount: Int, val share: Int = 0)
+
+/** Distribuzione degli ascolti per anno di pubblicazione: l'"età musicale". */
+@Serializable
+data class ReleaseYearStats(
+    val years: List<ReleaseYear> = emptyList(),
+    val decades: List<Decade> = emptyList(),
+    val averageYear: Int? = null,
+    val medianYear: Int? = null,
+    val oldestYear: Int? = null,
+    val newestYear: Int? = null,
+    /** Ascolti su cui il calcolo si basa: alcuni album non hanno una data. */
+    val coveredPlays: Int = 0,
+)
+
+@Serializable
 data class ClockHour(val hour: Int, val playCount: Int)
 
 @Serializable
@@ -185,6 +204,9 @@ data class Recap(
     val topAlbums: List<TopAlbum> = emptyList(),
     val topGenres: List<TopGenre> = emptyList(),
     val busiestDay: BusiestDay? = null,
+    /** Solo nei recap mensili e annuali: su finestre brevi l'anno medio
+     *  sarebbe calcolato su troppi pochi ascolti per significare qualcosa. */
+    val releaseYears: ReleaseYearStats? = null,
     val minutesChangePct: Int? = null,
 )
 

@@ -5,6 +5,7 @@ import {
   getArtistDetail,
   getListeningClock,
   getOverview,
+  getReleaseYearStats,
   getStreak,
   getTimeline,
   getTopAlbums,
@@ -76,6 +77,15 @@ statsRoutes.get('/clock', async (c) => {
   const user = c.get('user');
   const range = resolveRange(c, user);
   return c.json({ hours: await getListeningClock(user.id, range, user.timezone) });
+});
+
+/**
+ * Distribuzione degli ascolti per anno di pubblicazione, con l'anno medio
+ * ponderato: quanto è "vecchia" la musica che si ascolta.
+ */
+statsRoutes.get('/release-years', async (c) => {
+  const user = c.get('user');
+  return c.json(await getReleaseYearStats(user.id, resolveRange(c, user)));
 });
 
 statsRoutes.get('/track/:id', async (c) => {

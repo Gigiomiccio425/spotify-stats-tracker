@@ -9,14 +9,18 @@ export const recapRoutes = new Hono<AuthedEnv>();
 
 recapRoutes.use('*', requireAuth);
 
-const TYPES: PeriodType[] = ['week', 'month', 'year'];
+const TYPES: PeriodType[] = ['day', 'week', 'month', 'year'];
 
 function parseType(raw: string | undefined): PeriodType {
   if (!raw || !TYPES.includes(raw as PeriodType)) {
-    throw new HTTPException(400, { message: 'Tipo di recap: week, month o year' });
+    throw new HTTPException(400, { message: 'Tipo di recap: day, week, month o year' });
   }
   return raw as PeriodType;
 }
+
+/** I giorni si accumulano in fretta: senza un limite più basso la lista dei
+ *  recap diventerebbe un elenco di centinaia di voci quasi identiche. */
+const DEFAULT_LIMIT: Record<PeriodType, number> = { day: 30, week: 24, month: 24, year: 10 };
 
 /**
  * Elenco dei recap disponibili. Include il periodo in corso marcato
@@ -26,13 +30,13 @@ function parseType(raw: string | undefined): PeriodType {
 recapRoutes.get('/', async (c) => {
   const user = c.get('user');
   const ctx = periodContext(user);
-  const limit = intParam(c, 'limit', 24, 200);
+  const requestedLimit = c.req.query('limit') ? intParam(c, 'limit', 24, 200) : null;
 
   const typeParam = c.req.query('type');
   const types = typeParam ? [parseType(typeParam)] : TYPES;
 
   const groups = types.map((type) => {
-    const completed = listCompletedPeriods(type, ctx, new Date(), limit);
+    const completed = listCompletedPeriods(type, ctx, new Date(), requestedLimit ?? DEFAULT_LIMIT[type]);
     const current = periodContaining(type, ctx);
     return {
       type,

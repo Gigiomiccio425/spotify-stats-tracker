@@ -38,6 +38,30 @@ describe('startOfLocalDay', () => {
   });
 });
 
+describe('periodo giornaliero', () => {
+  it('va da mezzanotte a mezzanotte locale', () => {
+    const day = periodContaining('day', ctx('2026-01-01T00:00:00Z'), new Date('2026-07-15T10:00:00Z'));
+    expect(day.start.toISOString()).toBe('2026-07-14T22:00:00.000Z');
+    expect(day.end.toISOString()).toBe('2026-07-15T22:00:00.000Z');
+    expect(day.key).toBe('2026-07-15');
+    expect(day.label).toBe('15 luglio 2026');
+  });
+
+  it('resta un giorno anche in modalità anniversario', () => {
+    // Ancorare la giornata all'ora del collegamento darebbe finestre che
+    // iniziano alle 12:00: nessuno ragiona così.
+    const c = ctx('2026-07-15T12:00:00Z', 'anniversary')
+    const day = periodContaining('day', c, new Date('2026-07-20T08:00:00Z'));
+    expect(day.start.toISOString()).toBe('2026-07-19T22:00:00.000Z');
+    expect(day.end.toISOString()).toBe('2026-07-20T22:00:00.000Z');
+  });
+
+  it('dura 23 ore nel giorno in cui scatta l ora legale', () => {
+    const day = periodContaining('day', ctx('2026-01-01T00:00:00Z'), new Date('2026-03-29T12:00:00Z'));
+    expect((day.end.getTime() - day.start.getTime()) / HOUR).toBe(23);
+  });
+});
+
 describe('periodi calendario', () => {
   const c = ctx('2026-01-01T00:00:00Z');
 

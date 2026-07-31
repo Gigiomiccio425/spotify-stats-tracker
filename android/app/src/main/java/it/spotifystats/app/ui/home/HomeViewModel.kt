@@ -30,7 +30,7 @@ class HomeViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
-    private var range = "since_tracking"
+    private var range = "lifetime"
 
     init {
         load()

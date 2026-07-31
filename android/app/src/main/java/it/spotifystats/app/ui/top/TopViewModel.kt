@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import it.spotifystats.app.data.StatsRepository
 import it.spotifystats.app.data.api.TopAlbum
 import it.spotifystats.app.data.api.TopArtist
+import it.spotifystats.app.data.api.ReleaseYearStats
 import it.spotifystats.app.data.api.TopGenre
 import it.spotifystats.app.data.api.TopTrack
 import it.spotifystats.app.ui.UiState
@@ -18,6 +19,7 @@ enum class TopTab(val label: String) {
     Artists("Artisti"),
     Albums("Album"),
     Genres("Generi"),
+    Years("Anni"),
 }
 
 /** Una sola lista per volta: quale dipende dalla scheda attiva. */
@@ -28,6 +30,7 @@ data class TopData(
     val artists: List<TopArtist> = emptyList(),
     val albums: List<TopAlbum> = emptyList(),
     val genres: List<TopGenre> = emptyList(),
+    val releaseYears: ReleaseYearStats? = null,
     val canLoadMore: Boolean = false,
     val loadingMore: Boolean = false,
 )
@@ -43,7 +46,7 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
     private var tab = TopTab.Tracks
-    private var range = "since_tracking"
+    private var range = "lifetime"
 
     init {
         load()
@@ -93,6 +96,7 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
                 TopTab.Artists -> data.artists.size
                 TopTab.Albums -> data.albums.size
                 TopTab.Genres -> data.genres.size
+                TopTab.Years -> 0
             }
             fetch(offset).onSuccess { page ->
                 _state.value = UiState.Ready(
@@ -128,6 +132,11 @@ class TopViewModel(private val repository: StatsRepository) : ViewModel() {
         // I generi sono poche decine in tutto: niente paginazione.
         TopTab.Genres -> repository.topGenres(range, 50).map {
             TopData(tab, range, genres = it, canLoadMore = false)
+        }
+        // Gli anni arrivano gia' aggregati dal server, con media e mediana
+        // calcolate su tutti gli ascolti del periodo: nessuna pagina da scorrere.
+        TopTab.Years -> repository.releaseYears(range).map {
+            TopData(tab, range, releaseYears = it, canLoadMore = false)
         }
     }
 }

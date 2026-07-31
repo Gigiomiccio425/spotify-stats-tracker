@@ -6,8 +6,10 @@ import {
   getTopAlbums,
   getTopArtists,
   getTopGenres,
+  getReleaseYearStats,
   getTopTracks,
   type Range,
+  type ReleaseYearStats,
   ts,
 } from './stats.js';
 
@@ -38,6 +40,13 @@ export interface Recap {
   topAlbums: Awaited<ReturnType<typeof getTopAlbums>>;
   topGenres: Awaited<ReturnType<typeof getTopGenres>>;
   busiestDay: { day: string; playCount: number; minutesPlayed: number } | null;
+  /**
+   * Presente solo nei recap mensili e annuali.
+   * Su una giornata o una settimana l'anno di pubblicazione medio è calcolato
+   * su troppi pochi ascolti per dire qualcosa: basterebbe un album vecchio
+   * riascoltato tre volte per spostarlo di vent'anni.
+   */
+  releaseYears: ReleaseYearStats | null;
   /** Variazione dei minuti rispetto al periodo precedente, in percentuale.
    *  null quando non esiste un periodo precedente con cui confrontarsi. */
   minutesChangePct: number | null;
@@ -73,18 +82,30 @@ export async function buildRecap(
 ): Promise<Recap> {
   const range: Range = { from: period.start, to: period.end };
 
-  const [overview, topTracks, topArtists, topAlbums, topGenres, busiestDay, previousOverview] =
-    await Promise.all([
-      getOverview(userId, range, timeZone),
-      getTopTracks(userId, range, 10),
-      getTopArtists(userId, range, 10),
-      getTopAlbums(userId, range, 5),
-      getTopGenres(userId, range, 5),
-      getBusiestDay(userId, range, timeZone),
-      previous
-        ? getOverview(userId, { from: previous.start, to: previous.end }, timeZone)
-        : Promise.resolve(null),
-    ]);
+  // L'analisi degli anni di pubblicazione ha senso solo su finestre lunghe.
+  const wantsReleaseYears = period.type === 'month' || period.type === 'year';
+
+  const [
+    overview,
+    topTracks,
+    topArtists,
+    topAlbums,
+    topGenres,
+    busiestDay,
+    previousOverview,
+    releaseYears,
+  ] = await Promise.all([
+    getOverview(userId, range, timeZone),
+    getTopTracks(userId, range, 10),
+    getTopArtists(userId, range, 10),
+    getTopAlbums(userId, range, 5),
+    getTopGenres(userId, range, 5),
+    getBusiestDay(userId, range, timeZone),
+    previous
+      ? getOverview(userId, { from: previous.start, to: previous.end }, timeZone)
+      : Promise.resolve(null),
+    wantsReleaseYears ? getReleaseYearStats(userId, range) : Promise.resolve(null),
+  ]);
 
   // Il confronto ha senso solo se il periodo precedente aveva dati: partire da
   // zero darebbe sempre "+infinito%".
@@ -114,6 +135,7 @@ export async function buildRecap(
     topAlbums,
     topGenres,
     busiestDay,
+    releaseYears,
     minutesChangePct,
   };
 }

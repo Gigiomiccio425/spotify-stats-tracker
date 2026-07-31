@@ -247,6 +247,104 @@ export async function getTimeline(
   ).map((r) => ({ ...r, playCount: Number(r.playCount), msPlayed: Number(r.msPlayed) }));
 }
 
+export interface ReleaseYearStats {
+  years: { year: number; playCount: number; msPlayed: number }[];
+  decades: { decade: number; playCount: number; share: number }[];
+  /** Anno di pubblicazione medio, pesato sugli ascolti: l'"età musicale". */
+  averageYear: number | null;
+  /** Meno sensibile della media a un singolo brano molto vecchio o recente. */
+  medianYear: number | null;
+  oldestYear: number | null;
+  newestYear: number | null;
+  /** Ascolti su cui il calcolo si basa: alcuni album non hanno data. */
+  coveredPlays: number;
+}
+
+/**
+ * Distribuzione degli ascolti per anno di pubblicazione.
+ *
+ * Spotify espone `release_date` come testo, con precisione variabile: a volte
+ * "1998", a volte "1998-04-21". I primi quattro caratteri sono l'anno in
+ * entrambi i casi; le righe senza una data riconoscibile vengono escluse
+ * invece che contate come anno zero, che sposterebbe la media di secoli.
+ */
+export async function getReleaseYearStats(
+  userId: string,
+  range: Range,
+): Promise<ReleaseYearStats> {
+  const raw = (
+    await rows<{ year: number; playCount: number; msPlayed: number }>(sql`
+      select
+        substring(al.release_date from 1 for 4)::int as year,
+        count(*)::int            as "playCount",
+        sum(p.ms_played)::bigint as "msPlayed"
+      from plays p
+      join tracks t on t.id = p.track_id
+      join albums al on al.id = t.album_id
+      where p.user_id = ${userId}
+        and p.played_at >= ${ts(range.from)} and p.played_at < ${ts(range.to)}
+        and al.release_date ~ '^[0-9]{4}'
+      group by 1
+      order by 1 asc
+    `)
+  ).map((r) => ({
+    year: Number(r.year),
+    playCount: Number(r.playCount),
+    msPlayed: Number(r.msPlayed),
+  }));
+
+  const coveredPlays = raw.reduce((sum, r) => sum + r.playCount, 0);
+
+  if (coveredPlays === 0) {
+    return {
+      years: [],
+      decades: [],
+      averageYear: null,
+      medianYear: null,
+      oldestYear: null,
+      newestYear: null,
+      coveredPlays: 0,
+    };
+  }
+
+  const weightedSum = raw.reduce((sum, r) => sum + r.year * r.playCount, 0);
+
+  // Mediana pesata: si avanza lungo gli anni ordinati finché non si supera
+  // metà degli ascolti. Non serve espandere la lista ascolto per ascolto.
+  const half = coveredPlays / 2;
+  let running = 0;
+  let medianYear = raw[0]!.year;
+  for (const entry of raw) {
+    running += entry.playCount;
+    if (running >= half) {
+      medianYear = entry.year;
+      break;
+    }
+  }
+
+  const byDecade = new Map<number, number>();
+  for (const entry of raw) {
+    const decade = Math.floor(entry.year / 10) * 10;
+    byDecade.set(decade, (byDecade.get(decade) ?? 0) + entry.playCount);
+  }
+
+  return {
+    years: raw,
+    decades: [...byDecade.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([decade, playCount]) => ({
+        decade,
+        playCount,
+        share: Math.round((playCount / coveredPlays) * 100),
+      })),
+    averageYear: Math.round(weightedSum / coveredPlays),
+    medianYear,
+    oldestYear: raw[0]!.year,
+    newestYear: raw[raw.length - 1]!.year,
+    coveredPlays,
+  };
+}
+
 /** Istogramma degli ascolti per ora del giorno, nel fuso dell'utente. */
 export async function getListeningClock(
   userId: string,
