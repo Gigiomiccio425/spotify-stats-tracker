@@ -26,3 +26,4 @@ reintroduce il bug che avevano risolto.
 | File | Contenuto |
 |---|---|
 | [0001-baseline-app.md](0001-baseline-app.md) | Stato completo dell'app: schermate, API, comportamenti |
+| [0002-fix-404-recap-giornalieri.md](0002-fix-404-recap-giornalieri.md) | 404 sui recap giornalieri con ora di inizio pomeridiana |

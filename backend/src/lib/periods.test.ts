@@ -205,6 +205,23 @@ describe('periodFromKey', () => {
     expect(old?.label).toBe('marzo 2014');
   });
 
+  it('risolve i giorni con qualsiasi ora di inizio, anche pomeridiana', () => {
+    // Con un ancoraggio fisso a mezzogiorno, un inizio giornata dopo le 12
+    // faceva ricadere il calcolo nella giornata precedente: la chiave non
+    // combaciava e il recap rispondeva 404.
+    for (const hour of [0, 4, 12, 13, 20, 23]) {
+      const c = { ...ctx('2026-01-01T00:00:00Z'), dayStartHour: hour };
+      const period = periodFromKey('day', '2026-07-15', c);
+      expect(period, `ora di inizio ${hour}`).not.toBeNull();
+      expect(period!.key).toBe('2026-07-15');
+    }
+  });
+
+  it('risolve il giorno del cambio di ora legale, che dura 23 ore', () => {
+    const c = { ...ctx('2026-01-01T00:00:00Z'), dayStartHour: 20 };
+    expect(periodFromKey('day', '2026-03-29', c)?.key).toBe('2026-03-29');
+  });
+
   it('rifiuta chiavi mal formate o del tipo sbagliato', () => {
     expect(periodFromKey('month', '2026-W29', c)).toBeNull();
     expect(periodFromKey('day', 'domani', c)).toBeNull();

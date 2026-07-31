@@ -361,7 +361,20 @@ function anchorFromKey(type: PeriodType, key: string, ctx: PeriodContext): Date 
   const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
   if (isoDate) {
     const [, y, m, d] = isoDate;
-    // Mezzogiorno: lontano da qualsiasi confine di giornata.
+
+    if (type === 'day') {
+      // Si parte dall'inizio effettivo della giornata e si avanza di sei ore.
+      // Con mezzogiorno fisso, un'ora di inizio giornata successiva alle 12
+      // faceva ricadere il calcolo nella giornata precedente: la chiave
+      // ricostruita non combaciava e il recap rispondeva 404.
+      // Sei ore stanno dentro qualsiasi giornata, comprese quelle da 23 ore
+      // del cambio di ora legale.
+      const start = zonedToUtc(timeZone, Number(y), Number(m), Number(d), ctx.dayStartHour ?? 0);
+      return new Date(start.getTime() + 6 * 3600_000);
+    }
+
+    // Per gli altri tipi la chiave in questa forma è l'inizio di un periodo ad
+    // anniversario, che comincia sempre a mezzanotte locale.
     return zonedToUtc(timeZone, Number(y), Number(m), Number(d), 12);
   }
 
