@@ -3,7 +3,7 @@ import { withCatalogToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { importJobs, plays, tracks, users } from '../db/schema.js';
 import { enrichPendingArtists, upsertTracksFromSpotify } from '../lib/catalog.js';
-import { getTracksByIds } from '../spotify/client.js';
+import { SpotifyError, getTracksByIds } from '../spotify/client.js';
 
 /**
  * Una riga del file *Extended Streaming History* che Spotify consegna su
@@ -169,6 +169,12 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
       ).map((r) => r.id),
     );
 
+    // Un rifiuto di Spotify a metà strada non deve buttare via il file: gli
+    // ascolti dei brani già in catalogo si possono archiviare comunque, e
+    // ricaricare lo stesso file più tardi non duplica nulla. Prima si perdeva
+    // tutto e l'utente si ritrovava "0 importati".
+    let catalogError: string | null = null;
+
     const missing = trackIds.filter((id) => !known.has(id));
     if (missing.length) {
       // 50 id per chiamata: il conto delle chiamate dice all'utente quanto
@@ -179,9 +185,19 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
           jobId,
           `Brani da Spotify: ${Math.min(i + slice.length, missing.length)} di ${missing.length}`,
         );
-        const fetched = await withCatalogToken((token) => getTracksByIds(token, slice));
-        await upsertTracksFromSpotify(fetched);
-        for (const t of fetched) if (t.id) known.add(t.id);
+
+        try {
+          const fetched = await withCatalogToken((token) => getTracksByIds(token, slice));
+          await upsertTracksFromSpotify(fetched);
+          for (const t of fetched) if (t.id) known.add(t.id);
+        } catch (err) {
+          if (!(err instanceof SpotifyError)) throw err;
+          // Insistere sui blocchi successivi non ha senso: se Spotify rifiuta
+          // una richiesta di catalogo, rifiuta anche le prossime.
+          catalogError = describeCatalogError(err, missing.length - i);
+          console.error(`[import] catalogo non raggiungibile, importo il parziale: ${err.message}`);
+          break;
+        }
       }
     }
 
@@ -229,6 +245,7 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
       .set({
         status: 'done',
         phase: null,
+        warning: catalogError,
         rowsImported: imported,
         rowsSkipped: entries.length - imported,
         finishedAt: new Date(),
@@ -251,6 +268,24 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
       .where(eq(importJobs.id, jobId));
     throw err;
   }
+}
+
+/**
+ * Traduce il rifiuto di Spotify in una frase che dica all'utente cosa è
+ * successo e cosa può fare. `403 Forbidden` da solo non lo dice a nessuno.
+ */
+function describeCatalogError(err: SpotifyError, notFetched: number): string {
+  const rimedio =
+    `${notFetched} brani non recuperati: i loro ascolti non sono stati importati. ` +
+    'Ricarica lo stesso file più tardi, gli ascolti già archiviati non vengono duplicati.';
+
+  if (err.status === 403) {
+    return `Spotify ha rifiutato le richieste sul catalogo (403). ${rimedio}`;
+  }
+  if (err.status === 429) {
+    return `Spotify ha imposto una pausa per troppe richieste (429). ${rimedio}`;
+  }
+  return `Spotify non risponde alle richieste sul catalogo (${err.status}). ${rimedio}`;
 }
 
 /**

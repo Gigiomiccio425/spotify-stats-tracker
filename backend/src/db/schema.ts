@@ -237,6 +237,12 @@ export const importJobs = pgTable(
     rowsImported: integer('rows_imported').notNull().default(0),
     rowsSkipped: integer('rows_skipped').notNull().default(0),
     error: text('error'),
+    /**
+     * Import riuscito ma incompleto. Diverso da `error`: gli ascolti che si
+     * potevano archiviare ci sono, e ricaricare lo stesso file più tardi
+     * completa il lavoro senza duplicare nulla.
+     */
+    warning: text('warning'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
     startedAt: timestamp('started_at', tz),
     finishedAt: timestamp('finished_at', tz),

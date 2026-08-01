@@ -299,6 +299,8 @@ data class ImportJob(
     val rowsImported: Int = 0,
     val rowsSkipped: Int = 0,
     val error: String? = null,
+    /** Import riuscito ma incompleto: gli ascolti archiviabili ci sono. */
+    val warning: String? = null,
     val enrichment: EnrichmentStatus? = null,
 ) {
     val finished: Boolean get() = status == "done" || status == "error"

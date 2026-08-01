@@ -93,7 +93,8 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
                 message = when {
                     job == null -> "Import di ${open.filename}: stato non recuperabile"
                     job.status == "error" -> "${open.filename}: ${job.error ?: "import non riuscito"}"
-                    else -> "${job.rowsImported} ascolti importati da ${open.filename}"
+                    else -> "${job.rowsImported} ascolti importati da ${open.filename}" +
+                        (job.warning?.let { "\n$it" } ?: "")
                 },
             )
             load()
@@ -151,6 +152,7 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
         viewModelScope.launch {
             var imported = 0
             val failures = mutableListOf<String>()
+            val warnings = mutableListOf<String>()
             var enrichmentRunning = false
 
             uris.forEachIndexed { index, uri ->
@@ -176,6 +178,7 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
                     failures += "$name: ${job.error ?: "import non riuscito"}"
                 } else {
                     imported += job.rowsImported
+                    job.warning?.let { warnings += it }
                 }
                 enrichmentRunning = job.enrichment?.running == true
             }
@@ -187,6 +190,10 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
                     if (enrichmentRunning) {
                         append(". Foto e generi degli artisti arrivano man mano.")
                     }
+                    // Distinti dai fallimenti: qui il file è passato, ma solo
+                    // in parte. Nasconderlo farebbe credere completo un
+                    // archivio che non lo è.
+                    warnings.distinct().forEach { append("\n$it") }
                     failures.forEach { append("\n$it") }
                 },
             )

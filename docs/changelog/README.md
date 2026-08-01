@@ -29,3 +29,4 @@ reintroduce il bug che avevano risolto.
 | [0002-fix-404-recap-giornalieri.md](0002-fix-404-recap-giornalieri.md) | 404 sui recap giornalieri con ora di inizio pomeridiana |
 | [0003-import-storico-in-sottofondo.md](0003-import-storico-in-sottofondo.md) | Import dell'archivio in coda, con avanzamento: prima falliva sempre |
 | [0004-403-catalogo-token-applicativo.md](0004-403-catalogo-token-applicativo.md) | 403 sul catalogo Spotify: ripiego sul token di un utente |
+| [0005-import-parziale-invece-di-perdere-tutto.md](0005-import-parziale-invece-di-perdere-tutto.md) | Import incompleto invece di zero quando Spotify rifiuta |
