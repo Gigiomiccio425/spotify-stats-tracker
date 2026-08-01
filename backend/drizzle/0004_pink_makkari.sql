@@ -1,0 +1,1 @@
+ALTER TABLE "import_jobs" ADD COLUMN "rows_duplicate" integer DEFAULT 0 NOT NULL;

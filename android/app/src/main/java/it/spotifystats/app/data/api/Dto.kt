@@ -297,6 +297,8 @@ data class ImportJob(
     val phase: String? = null,
     val rowsTotal: Int = 0,
     val rowsImported: Int = 0,
+    /** Ascolti del file che erano già in archivio: non è un fallimento. */
+    val rowsDuplicate: Int = 0,
     val rowsSkipped: Int = 0,
     val error: String? = null,
     /** Import riuscito ma incompleto: gli ascolti archiviabili ci sono. */

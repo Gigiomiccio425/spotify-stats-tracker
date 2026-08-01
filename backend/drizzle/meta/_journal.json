@@ -29,6 +29,13 @@
       "when": 1785543961180,
       "tag": "0003_illegal_grey_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785589235728,
+      "tag": "0004_pink_makkari",
+      "breakpoints": true
     }
   ]
 }

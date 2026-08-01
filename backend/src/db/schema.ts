@@ -236,6 +236,13 @@ export const importJobs = pgTable(
     rowsTotal: integer('rows_total').notNull().default(0),
     rowsImported: integer('rows_imported').notNull().default(0),
     rowsSkipped: integer('rows_skipped').notNull().default(0),
+    /**
+     * Righe che erano già in archivio. Distinguerle dalle nuove è ciò che
+     * separa "l'import non ha funzionato" da "avevi già questi ascolti":
+     * ricaricare un file due volte dà zero righe nuove, ed è il risultato
+     * giusto.
+     */
+    rowsDuplicate: integer('rows_duplicate').notNull().default(0),
     error: text('error'),
     /**
      * Import riuscito ma incompleto. Diverso da `error`: gli ascolti che si

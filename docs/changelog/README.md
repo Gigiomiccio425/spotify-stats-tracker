@@ -32,3 +32,4 @@ reintroduce il bug che avevano risolto.
 | [0005-import-parziale-invece-di-perdere-tutto.md](0005-import-parziale-invece-di-perdere-tutto.md) | Import incompleto invece di zero quando Spotify rifiuta |
 | [0006-rate-limit-spotify.md](0006-rate-limit-spotify.md) | Il 403 era il rate limit: tetto alle chiamate e pausa dopo un rifiuto |
 | [0007-versioni-e-aggiornamento-in-app.md](0007-versioni-e-aggiornamento-in-app.md) | Firma stabile, release automatiche, controllo aggiornamenti nell'app |
+| [0008-conteggi-import-veritieri.md](0008-conteggi-import-veritieri.md) | "0 importati" distinto da "erano già in archivio" |

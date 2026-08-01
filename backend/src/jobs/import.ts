@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray } from 'drizzle-orm';
-import { withCatalogToken } from '../auth/spotify.js';
+import { CatalogUnavailableError, withCatalogToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { importJobs, plays, tracks, users } from '../db/schema.js';
 import { enrichPendingArtists, upsertTracksFromSpotify } from '../lib/catalog.js';
@@ -247,7 +247,8 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
         phase: null,
         warning: catalogError,
         rowsImported: imported,
-        rowsSkipped: entries.length - imported,
+        rowsDuplicate: rows.length - imported,
+        rowsSkipped: entries.length - rows.length,
         finishedAt: new Date(),
       })
       .where(eq(importJobs.id, jobId));
@@ -278,6 +279,10 @@ function describeCatalogError(err: SpotifyError, notFetched: number): string {
   const rimedio =
     `${notFetched} brani non recuperati: i loro ascolti non sono stati importati. ` +
     'Ricarica lo stesso file più tardi, gli ascolti già archiviati non vengono duplicati.';
+
+  // La pausa interna sa già dire quanto manca: il suo messaggio vale più di
+  // qualunque riformulazione.
+  if (err instanceof CatalogUnavailableError) return `${err.message}. ${rimedio}`;
 
   if (err.status === 403) {
     return `Spotify ha rifiutato le richieste sul catalogo (403). ${rimedio}`;

@@ -126,7 +126,7 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
                 message = when {
                     job == null -> "Import di ${open.filename}: stato non recuperabile"
                     job.status == "error" -> "${open.filename}: ${job.error ?: "import non riuscito"}"
-                    else -> "${job.rowsImported} ascolti importati da ${open.filename}" +
+                    else -> summary(job.rowsImported, job.rowsDuplicate) +
                         (job.warning?.let { "\n$it" } ?: "")
                 },
             )
@@ -184,6 +184,7 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
 
         viewModelScope.launch {
             var imported = 0
+            var duplicate = 0
             val failures = mutableListOf<String>()
             val warnings = mutableListOf<String>()
             var enrichmentRunning = false
@@ -211,6 +212,7 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
                     failures += "$name: ${job.error ?: "import non riuscito"}"
                 } else {
                     imported += job.rowsImported
+                    duplicate += job.rowsDuplicate
                     job.warning?.let { warnings += it }
                 }
                 enrichmentRunning = job.enrichment?.running == true
@@ -219,9 +221,9 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
             _importProgress.value = ImportProgress(
                 running = false,
                 message = buildString {
-                    append("$imported ascolti importati")
+                    append(summary(imported, duplicate))
                     if (enrichmentRunning) {
-                        append(". Foto e generi degli artisti arrivano man mano.")
+                        append(" Foto e generi degli artisti arrivano man mano.")
                     }
                     // Distinti dai fallimenti: qui il file è passato, ma solo
                     // in parte. Nasconderlo farebbe credere completo un
@@ -232,6 +234,19 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
             )
             load()
         }
+    }
+
+    /**
+     * "0 ascolti importati" da solo è fuorviante: è anche il risultato di un
+     * file caricato due volte, dove non c'era niente di nuovo da aggiungere e
+     * l'import è andato benissimo.
+     */
+    private fun summary(imported: Int, duplicate: Int): String = when {
+        imported == 0 && duplicate > 0 ->
+            "Nessun ascolto nuovo: questi $duplicate erano già in archivio."
+        imported == 0 -> "Nessun ascolto importato."
+        duplicate > 0 -> "$imported ascolti importati, $duplicate erano già in archivio."
+        else -> "$imported ascolti importati."
     }
 
     private fun report(label: String, phase: String) {

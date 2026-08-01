@@ -261,6 +261,15 @@ export async function getAnyUserAccessToken(): Promise<string> {
   throw new Error('Nessun account Spotify collegato con credenziali valide');
 }
 
+/**
+ * La pausa decisa da noi, non un rifiuto arrivato adesso da Spotify.
+ *
+ * Serve a distinguerle: il messaggio di questa dice **quanto manca**, e
+ * sostituirlo con un generico "403" toglie a chi lo legge l'unica informazione
+ * utile che contiene.
+ */
+export class CatalogUnavailableError extends SpotifyError {}
+
 /** Quanto si sta senza riprovare il token applicativo dopo un suo 403. */
 const APP_TOKEN_COOLDOWN_MS = 60 * 60_000;
 
@@ -296,8 +305,8 @@ export async function withCatalogToken<T>(fn: (token: string) => Promise<T>): Pr
 
   if (now < catalogBlockedUntil) {
     const minuti = Math.ceil((catalogBlockedUntil - now) / 60_000);
-    throw new SpotifyError(
-      `Catalogo Spotify in pausa dopo un rifiuto: si riprova fra ${minuti} minuti`,
+    throw new CatalogUnavailableError(
+      `Spotify ha bloccato l accesso al catalogo. Si riprova fra ${minuti} minuti`,
       403,
       '',
     );
