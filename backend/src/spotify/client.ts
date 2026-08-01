@@ -39,6 +39,9 @@ interface RequestOptions {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Oltre questo `Retry-After` non si aspetta più: si segnala l'errore. */
+const MAX_RETRY_AFTER_SECONDS = 60;
+
 /**
  * Wrapper unico su tutte le chiamate all'API. Tenerle in un solo punto limita
  * i danni quando Spotify deprecherà il prossimo endpoint.
@@ -67,9 +70,22 @@ export async function spotifyFetch<T>(
 
     // Spotify indica quanti secondi aspettare. Rispettarlo evita di peggiorare
     // il throttling: ignorarlo allunga il ban.
+    //
+    // Sopra il tetto però si rinuncia invece di dormire: quando Spotify chiude
+    // i rubinetti sul serio l'attesa richiesta è di ore, e restare fermi
+    // dentro un `await` per tutto quel tempo bloccherebbe l'import in corso e
+    // il poller, senza che nessuno possa accorgersene.
     if (res.status === 429 && attempt < retries) {
-      const retryAfter = Number(res.headers.get('retry-after') ?? '1');
-      await sleep((Number.isFinite(retryAfter) ? retryAfter : 1) * 1000 + 250);
+      const header = Number(res.headers.get('retry-after') ?? '1');
+      const retryAfter = Number.isFinite(header) ? header : 1;
+      if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
+        throw new SpotifyError(
+          `Rate limit di Spotify: chiede di attendere ${retryAfter}s su ${path}`,
+          429,
+          body,
+        );
+      }
+      await sleep(retryAfter * 1000 + 250);
       continue;
     }
 

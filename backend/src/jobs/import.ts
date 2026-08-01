@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray } from 'drizzle-orm';
-import { getAppAccessToken } from '../auth/spotify.js';
+import { withCatalogToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { importJobs, plays, tracks, users } from '../db/schema.js';
 import { enrichPendingArtists, upsertTracksFromSpotify } from '../lib/catalog.js';
@@ -24,6 +24,11 @@ export interface StreamingHistoryEntry {
  *  i dati importati sono confrontabili con quelli raccolti dal poller. */
 const MIN_MS_PLAYED = 30_000;
 const INSERT_CHUNK = 1000;
+
+/** Respiro fra due tornate di artisti, per non presentarsi a Spotify a raffica. */
+const SWEEP_PAUSE_MS = 1500;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * L'import gira in sottofondo, non dentro la richiesta HTTP.
@@ -166,7 +171,6 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
 
     const missing = trackIds.filter((id) => !known.has(id));
     if (missing.length) {
-      const token = await getAppAccessToken();
       // 50 id per chiamata: il conto delle chiamate dice all'utente quanto
       // manca meglio di qualsiasi percentuale inventata.
       for (let i = 0; i < missing.length; i += 1000) {
@@ -175,7 +179,7 @@ async function runImport({ jobId, userId, entries }: QueuedJob): Promise<void> {
           jobId,
           `Brani da Spotify: ${Math.min(i + slice.length, missing.length)} di ${missing.length}`,
         );
-        const fetched = await getTracksByIds(token, slice);
+        const fetched = await withCatalogToken((token) => getTracksByIds(token, slice));
         await upsertTracksFromSpotify(fetched);
         for (const t of fetched) if (t.id) known.add(t.id);
       }
@@ -267,8 +271,15 @@ async function sweepArtists(): Promise<void> {
       // Un file caricato nel frattempo ha la precedenza: gli ascolti valgono
       // più delle copertine.
       if (queue.length) break;
+      // Il rate limit di Spotify guarda una finestra scorrevole di pochi
+      // secondi: senza questa pausa una tornata parte appena finita la
+      // precedente e l'insieme diventa una raffica di centinaia di chiamate.
+      await sleep(SWEEP_PAUSE_MS);
     }
   } catch (err) {
+    // Non è recuperabile qui, e non deve esserlo: gli ascolti sono già
+    // archiviati, che è la sola cosa irrecuperabile. Gli artisti rimasti a
+    // metà restano in coda e il poller li riprende, cento alla volta.
     console.error('[import] recupero artisti interrotto', err);
   } finally {
     enrichment = { running: false, done: enrichment.done };

@@ -1,5 +1,5 @@
 import { inArray, sql } from 'drizzle-orm';
-import { getAppAccessToken } from '../auth/spotify.js';
+import { withCatalogToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { albumArtists, albums, artists, trackArtists, tracks } from '../db/schema.js';
 import { getArtistsByIds, pickImage } from '../spotify/client.js';
@@ -132,8 +132,8 @@ export async function enrichPendingArtists(limit = 200): Promise<number> {
 
   if (pending.length === 0) return 0;
 
-  const token = await getAppAccessToken();
-  const full = await getArtistsByIds(token, pending.map((a) => a.id));
+  const ids = pending.map((a) => a.id);
+  const full = await withCatalogToken((token) => getArtistsByIds(token, ids));
 
   if (full.length) {
     await db

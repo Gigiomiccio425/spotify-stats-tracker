@@ -3,6 +3,7 @@ import { and, eq, isNull, lt } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { oauthStates, spotifyCredentials } from '../db/schema.js';
 import { env } from '../env.js';
+import { SpotifyError } from '../spotify/client.js';
 import type { SpotifyTokenResponse } from '../spotify/types.js';
 import { decryptToken, encryptToken } from './crypto.js';
 
@@ -235,4 +236,62 @@ export async function getAppAccessToken(): Promise<string> {
   const tokens = (await res.json()) as SpotifyTokenResponse;
   appToken = { value: tokens.access_token, expiresAt: Date.now() + tokens.expires_in * 1000 };
   return appToken.value;
+}
+
+/**
+ * Un token utente qualsiasi, da usare quando quello applicativo non basta.
+ *
+ * Sul catalogo (tracce, album, artisti) i due leggono gli stessi identici dati:
+ * quale account lo chieda non cambia la risposta.
+ */
+export async function getAnyUserAccessToken(): Promise<string> {
+  const rows = await db
+    .select({ userId: spotifyCredentials.userId })
+    .from(spotifyCredentials)
+    .where(isNull(spotifyCredentials.invalidatedAt));
+
+  for (const row of rows) {
+    try {
+      return await getValidAccessToken(row.userId);
+    } catch {
+      // Credenziali di quell'utente inservibili: si prova il prossimo.
+    }
+  }
+
+  throw new Error('Nessun account Spotify collegato con credenziali valide');
+}
+
+/**
+ * Il token applicativo è stato rifiutato: per il resto della vita del processo
+ * si va direttamente di token utente. Senza memoria, ogni chiamata pagherebbe
+ * un 403 prima di riuscire.
+ */
+let appTokenRejected = false;
+
+/**
+ * Esegue una lettura del catalogo con il miglior token disponibile.
+ *
+ * Prima scelta il token applicativo: non consuma il rate limit di nessun
+ * utente e continua a valere anche se chi ha importato l'archivio revoca
+ * l'accesso. Ma Spotify può rifiutarlo con 403 su `/artists` e `/tracks` — è
+ * successo davvero, durante il recupero degli artisti di un archivio
+ * importato — e allora l'unica strada è il token di un utente collegato.
+ *
+ * Il ritentativo rifà `fn` da capo. Sono letture, ripeterle non fa danni.
+ */
+export async function withCatalogToken<T>(fn: (token: string) => Promise<T>): Promise<T> {
+  if (!appTokenRejected) {
+    try {
+      return await fn(await getAppAccessToken());
+    } catch (err) {
+      if (!(err instanceof SpotifyError) || err.status !== 403) throw err;
+      appTokenRejected = true;
+      console.warn(
+        '[spotify] token applicativo rifiutato con 403 sul catalogo: ' +
+          'passo al token di un utente collegato',
+      );
+    }
+  }
+
+  return fn(await getAnyUserAccessToken());
 }
