@@ -5,6 +5,7 @@ import it.spotifystats.app.data.api.ApiService
 import it.spotifystats.app.data.api.ArtistDetail
 import it.spotifystats.app.data.api.BackendNotConfiguredException
 import it.spotifystats.app.data.api.ClockResponse
+import it.spotifystats.app.data.api.HealthResponse
 import it.spotifystats.app.data.api.HistoryResponse
 import it.spotifystats.app.data.api.ImportJob
 import it.spotifystats.app.data.api.ImportJobsResponse
@@ -82,6 +83,8 @@ class StatsRepository(
         val body = error.response()?.errorBody()?.string()?.takeIf { it.isNotBlank() } ?: return null
         ApiClient.json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
     }.getOrNull()
+
+    suspend fun health(): Result<HealthResponse> = call { api.health() }
 
     suspend fun me(): Result<Me> = call { api.me() }
 

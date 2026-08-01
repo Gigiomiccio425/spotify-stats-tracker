@@ -10,6 +10,8 @@ import it.spotifystats.app.data.StatsRepository
 import it.spotifystats.app.data.api.ImportJob
 import it.spotifystats.app.data.api.Me
 import it.spotifystats.app.data.api.SettingsPatch
+import it.spotifystats.app.data.update.UpdateChecker
+import it.spotifystats.app.data.update.UpdateStatus
 import it.spotifystats.app.ui.UiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -70,9 +72,40 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _loggedOut = MutableStateFlow(false)
     val loggedOut: StateFlow<Boolean> = _loggedOut.asStateFlow()
 
+    private val _updateStatus = MutableStateFlow<UpdateStatus?>(null)
+    val updateStatus: StateFlow<UpdateStatus?> = _updateStatus.asStateFlow()
+
+    private val _backendVersion = MutableStateFlow<String?>(null)
+    val backendVersion: StateFlow<String?> = _backendVersion.asStateFlow()
+
     init {
         load()
         resumeRunningImport()
+        checkForUpdate()
+        loadBackendVersion()
+    }
+
+    /**
+     * Guarda su GitHub se esiste una versione più recente.
+     *
+     * Parte da solo all'apertura della schermata: un aggiornamento che va
+     * cercato a mano non viene cercato mai.
+     */
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            _updateStatus.value = UpdateStatus.Checking
+            _updateStatus.value = UpdateChecker.check()
+        }
+    }
+
+    /**
+     * Serve a rispondere a "il server sta girando la versione nuova?". Senza un
+     * numero visibile, dopo un aggiornamento dell'immagine si può solo sperare.
+     */
+    private fun loadBackendVersion() {
+        viewModelScope.launch {
+            _backendVersion.value = repository.health().getOrNull()?.version
+        }
     }
 
     /**

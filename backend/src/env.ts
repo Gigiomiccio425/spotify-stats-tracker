@@ -15,6 +15,11 @@ const schema = z.object({
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'TOKEN_ENC_KEY deve essere 32 byte in base64'),
   CRON_SECRET: z.string().min(16, 'CRON_SECRET troppo corto, usa `npm run keys`'),
 
+  // Scritta dentro l'immagine al momento della build. Serve a rispondere alla
+  // domanda "l'immagine che gira è davvero quella nuova?", che senza un numero
+  // visibile si può solo indovinare.
+  APP_VERSION: z.string().default('dev'),
+
   // Su un server sempre acceso il polling può girare dentro il processo, senza
   // dipendere da un cron esterno. Sugli host che sospendono il servizio dopo
   // qualche minuto di inattività va invece lasciato disattivato: il timer

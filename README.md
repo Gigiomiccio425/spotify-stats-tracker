@@ -53,13 +53,37 @@ docs/        changelog/ · SETUP.md · SPOTIFY_SETUP.md · DEPLOY_ZIMAOS.md · A
 
 GitHub Actions compila tutto a ogni push su `main`:
 
-- **Backend** — typecheck, 21 test sul calcolo dei periodi, build
-- **Android** — APK di debug scaricabile dagli artifact della run
+- **Backend** — typecheck, 31 test sul calcolo dei periodi, build
+- **Android** — APK firmato, pubblicato come
+  [release](https://github.com/Gigiomiccio425/spotify-stats-tracker/releases)
 - **Immagine backend** — pubblicata su `ghcr.io/gigiomiccio425/spotify-stats-tracker/backend`
 
-L'APK non serve compilarlo in locale: apri l'ultima run
-[Android](https://github.com/Gigiomiccio425/spotify-stats-tracker/actions/workflows/android.yml)
-e scarica l'artifact `app-debug-apk`.
+## Aggiornare l'app
+
+L'APK non serve compilarlo: scarica quello dell'ultima
+[release](https://github.com/Gigiomiccio425/spotify-stats-tracker/releases/latest) e aprilo. Si
+installa sopra la versione precedente, senza disinstallare e senza perdere impostazioni.
+
+L'app stessa controlla se esiste una versione più recente: **Profilo → Versione**, con il link per
+scaricarla.
+
+Perché funzioni, ogni APK è firmato con la stessa chiave, tenuta nei secret del repository
+(`ANDROID_KEYSTORE_BASE64` e compagni). Il numero interno di versione è il conteggio dei commit,
+così cresce da solo e Android non rifiuta mai l'aggiornamento; il nome leggibile sta in
+`android/gradle.properties`, alla voce `appVersionName`.
+
+> **La chiave di firma va conservata.** Perdendola non si possono più pubblicare aggiornamenti
+> installabili sopra quelli esistenti: servirebbe disinstallare l'app da ogni telefono. Non sta nel
+> repository. Per rigenerarla da zero:
+>
+> ```bash
+> keytool -genkeypair -keystore release.keystore -alias spotify-stats \
+>   -keyalg RSA -keysize 2048 -validity 10950
+> base64 -w0 release.keystore | gh secret set ANDROID_KEYSTORE_BASE64
+> gh secret set ANDROID_KEYSTORE_PASSWORD   # la password scelta sopra
+> gh secret set ANDROID_KEY_ALIAS           # spotify-stats
+> gh secret set ANDROID_KEY_PASSWORD        # la stessa password
+> ```
 
 ## Avvio
 

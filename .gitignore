@@ -16,4 +16,7 @@ android/app/build/
 android/local.properties
 android/.idea/
 *.apk
+# La chiave di firma non entra nel repository: chi ce l'ha può pubblicare un
+# APK che il telefono installa sopra questo senza chiedere niente.
 *.keystore
+*.jks

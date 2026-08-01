@@ -16,6 +16,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8787
 
+# Identifica l'immagine, e la risposta di /health la riporta. Senza, "ho
+# aggiornato il backend?" resta una domanda senza risposta certa.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 # Solo dipendenze di produzione. L'immagine precedente teneva anche quelle di
 # sviluppo per poter lanciare `npm run db:push` dentro il container: ora le
 # migrazioni si applicano da sole all'avvio, quindi npm a runtime non serve

@@ -22,7 +22,9 @@ app.use('*', logger());
 // strumenti di sviluppo e per un'eventuale dashboard web.
 app.use('/api/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'] }));
 
-app.get('/health', (c) => c.json({ ok: true, now: new Date().toISOString() }));
+app.get('/health', (c) =>
+  c.json({ ok: true, now: new Date().toISOString(), version: env.APP_VERSION }),
+);
 
 app.route('/auth', authRoutes);
 app.route('/api/account', accountRoutes);

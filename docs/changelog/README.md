@@ -31,3 +31,4 @@ reintroduce il bug che avevano risolto.
 | [0004-403-catalogo-token-applicativo.md](0004-403-catalogo-token-applicativo.md) | 403 sul catalogo Spotify: ripiego sul token di un utente |
 | [0005-import-parziale-invece-di-perdere-tutto.md](0005-import-parziale-invece-di-perdere-tutto.md) | Import incompleto invece di zero quando Spotify rifiuta |
 | [0006-rate-limit-spotify.md](0006-rate-limit-spotify.md) | Il 403 era il rate limit: tetto alle chiamate e pausa dopo un rifiuto |
+| [0007-versioni-e-aggiornamento-in-app.md](0007-versioni-e-aggiornamento-in-app.md) | Firma stabile, release automatiche, controllo aggiornamenti nell'app |

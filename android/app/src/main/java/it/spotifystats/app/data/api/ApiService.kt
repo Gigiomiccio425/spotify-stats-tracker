@@ -11,6 +11,10 @@ import retrofit2.http.Query
 
 interface ApiService {
 
+    /** Fuori da `/api`: non richiede sessione. Dice quale versione gira. */
+    @GET("health")
+    suspend fun health(): HealthResponse
+
     @GET("api/account/me")
     suspend fun me(): Me
 

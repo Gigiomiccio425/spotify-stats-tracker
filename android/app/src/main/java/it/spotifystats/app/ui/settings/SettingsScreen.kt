@@ -1,5 +1,6 @@
 package it.spotifystats.app.ui.settings
 
+import android.content.Intent
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,9 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.spotifystats.app.BuildConfig
 import it.spotifystats.app.StatsApplication
 import it.spotifystats.app.data.api.Me
+import it.spotifystats.app.data.update.UpdateStatus
 import it.spotifystats.app.ui.Format
 import it.spotifystats.app.ui.UiState
 import it.spotifystats.app.ui.components.Artwork
@@ -112,6 +116,90 @@ private fun ServerSection(serverUrl: String?, onChangeServer: () -> Unit) {
     }
 }
 
+/**
+ * Versione installata, versione del server, e l'aggiornamento se c'è.
+ *
+ * L'APK non arriva da uno store: senza un posto in cui l'app dica "ne esiste
+ * una più recente", l'unico modo di accorgersene è andare a guardare GitHub.
+ */
+@Composable
+private fun VersionSection(
+    updateStatus: UpdateStatus?,
+    backendVersion: String?,
+    onCheck: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    SectionTitle("Versione")
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            "App ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            // Il numero e' la revisione con cui l'immagine e' stata compilata:
+            // serve a confermare che la VPS stia davvero girando quella nuova.
+            backendVersion?.let { "Backend ${it.take(7)}" } ?: "Backend: versione non disponibile",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextTertiary,
+        )
+
+        VerticalSpacer(8)
+
+        when (updateStatus) {
+            null, UpdateStatus.Checking -> Text(
+                "Controllo aggiornamenti…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextTertiary,
+            )
+
+            UpdateStatus.UpToDate -> Text(
+                "È la versione più recente.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+            )
+
+            is UpdateStatus.Failed -> Text(
+                // Distinto da "sei aggiornato": il controllo non è riuscito,
+                // quindi non si sa se un aggiornamento esista.
+                "Controllo non riuscito: ${updateStatus.message}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Warning,
+            )
+
+            is UpdateStatus.Available -> {
+                val update = updateStatus.update
+                Text(
+                    "Disponibile la versione ${update.versionName} (build ${update.versionCode})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Accent,
+                )
+                Text(
+                    "Scaricala e aprila: si installa sopra questa, senza perdere nulla.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary,
+                )
+                TextButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, update.downloadUrl.toUri()),
+                        )
+                    },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text("Scarica l'aggiornamento", color = Accent)
+                }
+            }
+        }
+
+        if (updateStatus != UpdateStatus.Checking) {
+            TextButton(onClick = onCheck, contentPadding = PaddingValues(0.dp)) {
+                Text("Controlla di nuovo", color = TextSecondary)
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsContent(
     me: Me,
@@ -123,6 +211,8 @@ private fun SettingsContent(
     val context = LocalContext.current
     val app = context.applicationContext as StatsApplication
     var confirmDelete by remember { mutableStateOf(false) }
+    val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
+    val backendVersion by viewModel.backendVersion.collectAsStateWithLifecycle()
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
@@ -315,6 +405,13 @@ private fun SettingsContent(
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = TextTertiary)
             }
         }
+
+        HorizontalDivider(color = SurfaceElevated)
+        VersionSection(
+            updateStatus = updateStatus,
+            backendVersion = backendVersion,
+            onCheck = viewModel::checkForUpdate,
+        )
 
         HorizontalDivider(color = SurfaceElevated)
         SectionTitle("Account")

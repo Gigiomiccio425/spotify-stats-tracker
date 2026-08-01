@@ -313,6 +313,14 @@ data class EnrichmentStatus(
     val done: Int = 0,
 )
 
+/** `/health`. `version` identifica l'immagine del backend in esecuzione. */
+@Serializable
+data class HealthResponse(
+    val ok: Boolean = false,
+    val now: String? = null,
+    val version: String? = null,
+)
+
 @Serializable
 data class ImportJobsResponse(
     val jobs: List<ImportJob> = emptyList(),

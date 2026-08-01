@@ -51,6 +51,10 @@ jobs:
         with:
           context: ./backend
           push: true
+          # Finisce in /health: è così che si verifica che la VPS stia davvero
+          # girando l'immagine appena pubblicata.
+          build-args: |
+            APP_VERSION=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # La cache di GitHub Actions evita di reinstallare le dipendenze npm
