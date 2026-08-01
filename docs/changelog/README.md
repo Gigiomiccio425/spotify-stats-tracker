@@ -30,3 +30,4 @@ reintroduce il bug che avevano risolto.
 | [0003-import-storico-in-sottofondo.md](0003-import-storico-in-sottofondo.md) | Import dell'archivio in coda, con avanzamento: prima falliva sempre |
 | [0004-403-catalogo-token-applicativo.md](0004-403-catalogo-token-applicativo.md) | 403 sul catalogo Spotify: ripiego sul token di un utente |
 | [0005-import-parziale-invece-di-perdere-tutto.md](0005-import-parziale-invece-di-perdere-tutto.md) | Import incompleto invece di zero quando Spotify rifiuta |
+| [0006-rate-limit-spotify.md](0006-rate-limit-spotify.md) | Il 403 era il rate limit: tetto alle chiamate e pausa dopo un rifiuto |

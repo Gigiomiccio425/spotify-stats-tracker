@@ -2,6 +2,12 @@
 
 Correzione lato backend. Nessuna modifica al contratto API: **le app non vanno cambiate**.
 
+> **L'ipotesi di questo documento si è rivelata sbagliata.** Il ripiego sul token utente è scattato
+> e ha preso 403 anche lui: non è il tipo di token. La causa vera e la correzione stanno in
+> [0006](0006-rate-limit-spotify.md). Il ripiego resta, perché è comunque giusto averlo, ma è
+> diventato a tempo invece che definitivo. Il resto qui sotto è la diagnosi originale, tenuta perché
+> il ragionamento che ha portato fuori strada è utile quanto quello giusto.
+
 ## Contesto
 
 Durante il recupero di foto e generi degli artisti importati:

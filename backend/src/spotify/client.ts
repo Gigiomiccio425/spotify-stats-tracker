@@ -43,6 +43,33 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const MAX_RETRY_AFTER_SECONDS = 60;
 
 /**
+ * Distanza minima fra due chiamate a Spotify, valida per tutto il processo.
+ *
+ * Il rate limit di Spotify non guarda il totale giornaliero ma una finestra
+ * scorrevole di pochi secondi, e non è documentato quanto valga. Chiedere il
+ * catalogo per un archivio importato significa centinaia di chiamate: senza un
+ * tetto partivano una attaccata all'altra, il più veloce possibile. È il modo
+ * migliore per far scattare la protezione automatica, che non risponde 429 ma
+ * chiude l'accesso all'applicazione con dei 403 secchi — su tutti i token, non
+ * solo su quello che stava esagerando.
+ *
+ * Cinque chiamate al secondo allungano un import di grosse dimensioni di
+ * qualche minuto. Restare bloccati per ore costa molto di più.
+ */
+const MIN_REQUEST_GAP_MS = 200;
+
+let nextSlot = 0;
+
+async function takeSlot(): Promise<void> {
+  const now = Date.now();
+  const at = Math.max(now, nextSlot);
+  // Lo slot si prenota prima di aspettare: due chiamate in parallelo prendono
+  // due slot diversi invece di svegliarsi insieme.
+  nextSlot = at + MIN_REQUEST_GAP_MS;
+  if (at > now) await sleep(at - now);
+}
+
+/**
  * Wrapper unico su tutte le chiamate all'API. Tenerle in un solo punto limita
  * i danni quando Spotify deprecherà il prossimo endpoint.
  */
@@ -55,6 +82,8 @@ export async function spotifyFetch<T>(
   const url = path.startsWith('http') ? path : `${API}${path}`;
 
   for (let attempt = 0; ; attempt++) {
+    await takeSlot();
+
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal,

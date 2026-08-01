@@ -261,31 +261,54 @@ export async function getAnyUserAccessToken(): Promise<string> {
   throw new Error('Nessun account Spotify collegato con credenziali valide');
 }
 
-/**
- * Il token applicativo è stato rifiutato: per il resto della vita del processo
- * si va direttamente di token utente. Senza memoria, ogni chiamata pagherebbe
- * un 403 prima di riuscire.
- */
-let appTokenRejected = false;
+/** Quanto si sta senza riprovare il token applicativo dopo un suo 403. */
+const APP_TOKEN_COOLDOWN_MS = 60 * 60_000;
+
+/** Quanto si sta lontani dal catalogo dopo un 403 preso con entrambi i token. */
+const CATALOG_COOLDOWN_MS = 30 * 60_000;
+
+let appTokenRejectedUntil = 0;
+let catalogBlockedUntil = 0;
+
+const isForbidden = (err: unknown) => err instanceof SpotifyError && err.status === 403;
 
 /**
  * Esegue una lettura del catalogo con il miglior token disponibile.
  *
- * Prima scelta il token applicativo: non consuma il rate limit di nessun
- * utente e continua a valere anche se chi ha importato l'archivio revoca
- * l'accesso. Ma Spotify può rifiutarlo con 403 su `/artists` e `/tracks` — è
- * successo davvero, durante il recupero degli artisti di un archivio
- * importato — e allora l'unica strada è il token di un utente collegato.
+ * Prima scelta il token applicativo: non consuma il rate limit di nessun utente
+ * e continua a valere anche se chi ha importato l'archivio revoca l'accesso. Se
+ * viene rifiutato con 403 si prova con il token di un utente collegato, che sul
+ * catalogo legge gli stessi identici dati.
  *
- * Il ritentativo rifà `fn` da capo. Sono letture, ripeterle non fa danni.
+ * **Entrambe le scadenze sono a tempo, non definitive.** Il 403 sul catalogo
+ * non è arrivato per un difetto delle credenziali: è la protezione automatica
+ * di Spotify, che chiude l'accesso all'applicazione dopo troppe richieste
+ * ravvicinate e lo riapre da sola. Ricordare "il token applicativo non va"
+ * per sempre lo farebbe restare inutilizzato anche a blocco finito.
+ *
+ * Se anche il token utente viene rifiutato, non è il tipo di token: è
+ * l'applicazione a essere bloccata. Continuare a bussare allunga il blocco,
+ * quindi ci si ferma per mezz'ora — e lo si dice a chi chiama, invece di
+ * lasciar passare un 403 nudo.
  */
 export async function withCatalogToken<T>(fn: (token: string) => Promise<T>): Promise<T> {
-  if (!appTokenRejected) {
+  const now = Date.now();
+
+  if (now < catalogBlockedUntil) {
+    const minuti = Math.ceil((catalogBlockedUntil - now) / 60_000);
+    throw new SpotifyError(
+      `Catalogo Spotify in pausa dopo un rifiuto: si riprova fra ${minuti} minuti`,
+      403,
+      '',
+    );
+  }
+
+  if (now >= appTokenRejectedUntil) {
     try {
       return await fn(await getAppAccessToken());
     } catch (err) {
-      if (!(err instanceof SpotifyError) || err.status !== 403) throw err;
-      appTokenRejected = true;
+      if (!isForbidden(err)) throw err;
+      appTokenRejectedUntil = now + APP_TOKEN_COOLDOWN_MS;
       console.warn(
         '[spotify] token applicativo rifiutato con 403 sul catalogo: ' +
           'passo al token di un utente collegato',
@@ -293,5 +316,17 @@ export async function withCatalogToken<T>(fn: (token: string) => Promise<T>): Pr
     }
   }
 
-  return fn(await getAnyUserAccessToken());
+  try {
+    // Il ritentativo rifà `fn` da capo. Sono letture, ripeterle non fa danni.
+    return await fn(await getAnyUserAccessToken());
+  } catch (err) {
+    if (isForbidden(err)) {
+      catalogBlockedUntil = Date.now() + CATALOG_COOLDOWN_MS;
+      console.error(
+        '[spotify] catalogo rifiutato anche con il token di un utente: ' +
+          'non è il token, è l applicazione bloccata. Pausa di 30 minuti.',
+      );
+    }
+    throw err;
+  }
 }
