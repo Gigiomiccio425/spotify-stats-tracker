@@ -2,25 +2,62 @@ package it.spotifystats.app.ui.settings
 
 import android.content.ContentResolver
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import it.spotifystats.app.data.SessionExpiredException
 import it.spotifystats.app.data.StatsRepository
+import it.spotifystats.app.data.api.ImportJob
 import it.spotifystats.app.data.api.Me
 import it.spotifystats.app.data.api.SettingsPatch
 import it.spotifystats.app.ui.UiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody
+import okio.BufferedSink
+import okio.source
+import java.io.IOException
+
+/** Quanto spesso si chiede al server a che punto è l'import. */
+private const val POLL_INTERVAL_MS = 2000L
+
+/** Oltre questi tentativi falliti di fila si smette di seguire il job. */
+private const val MAX_POLL_FAILURES = 15
 
 data class ImportProgress(
     val running: Boolean = false,
     val message: String? = null,
 )
+
+/**
+ * Il corpo della richiesta è il file scelto dall'utente, copiato dal disco al
+ * socket senza passare per la memoria.
+ *
+ * Il flusso viene riaperto a ogni scrittura invece di essere tenuto: OkHttp può
+ * dover rimandare il corpo (un redirect, una connessione caduta e ripresa), e
+ * un flusso già consumato manderebbe un file vuoto.
+ */
+private class UriRequestBody(
+    private val resolver: ContentResolver,
+    private val uri: Uri,
+    private val size: Long,
+) : RequestBody() {
+
+    override fun contentType() = "application/json".toMediaType()
+
+    override fun contentLength() = size
+
+    override fun writeTo(sink: BufferedSink) {
+        val stream = resolver.openInputStream(uri) ?: throw IOException("File non leggibile")
+        stream.source().use { sink.writeAll(it) }
+    }
+}
 
 class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
 
@@ -33,10 +70,34 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
     private val _loggedOut = MutableStateFlow(false)
     val loggedOut: StateFlow<Boolean> = _loggedOut.asStateFlow()
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     init {
         load()
+        resumeRunningImport()
+    }
+
+    /**
+     * L'import gira sul server: chiudere l'app non lo ferma. Riaprendo questa
+     * schermata si torna a seguirlo, invece di mostrare un pulsante che
+     * risponderebbe "un import è già in corso".
+     */
+    private fun resumeRunningImport() {
+        viewModelScope.launch {
+            val open = repository.importJobs().getOrNull()?.jobs?.firstOrNull { !it.finished }
+                ?: return@launch
+
+            report(open.filename, describe(open))
+            val job = awaitJob(open.id) { report(open.filename, describe(it)) }.getOrNull()
+
+            _importProgress.value = ImportProgress(
+                running = false,
+                message = when {
+                    job == null -> "Import di ${open.filename}: stato non recuperabile"
+                    job.status == "error" -> "${open.filename}: ${job.error ?: "import non riuscito"}"
+                    else -> "${job.rowsImported} ascolti importati da ${open.filename}"
+                },
+            )
+            load()
+        }
     }
 
     fun load() {
@@ -73,55 +134,115 @@ class SettingsViewModel(private val repository: StatsRepository) : ViewModel() {
     }
 
     /**
-     * Importa i file dell'archivio Spotify, uno per volta.
+     * Importa i file dell'archivio Spotify, uno alla volta.
      *
-     * Il parsing avviene sul telefono perché il backend riceve già JSON pronto:
-     * i file sono da qualche decina di MB e leggerli in memoria è pesante ma
-     * accettabile per un'operazione che si fa una volta sola.
+     * Il file viene inviato tale e quale, senza essere letto in memoria: sono
+     * decine di MB, e costruirne l'albero JSON sul telefono per poi
+     * riserializzarlo costava parecchie volte la dimensione del file.
+     *
+     * Il server accoda e risponde subito; l'elaborazione vera dura minuti e la
+     * si segue interrogando lo stato del job. Aspettare dentro la richiesta
+     * HTTP non funzionava: scadeva prima il client, e comunque un proxy davanti
+     * al server chiude le connessioni ferme da troppo tempo.
      */
     fun importFiles(resolver: ContentResolver, uris: List<Uri>, names: List<String>) {
         if (uris.isEmpty()) return
 
         viewModelScope.launch {
-            _importProgress.value = ImportProgress(running = true, message = "Lettura dei file…")
             var imported = 0
-            var failed = 0
+            val failures = mutableListOf<String>()
+            var enrichmentRunning = false
 
             uris.forEachIndexed { index, uri ->
                 val name = names.getOrElse(index) { "file-$index.json" }
-                _importProgress.value = ImportProgress(
-                    running = true,
-                    message = "File ${index + 1} di ${uris.size}: $name",
-                )
+                val label = if (uris.size > 1) "File ${index + 1} di ${uris.size} · $name" else name
 
-                val parsed = runCatching {
-                    withContext(Dispatchers.IO) {
-                        resolver.openInputStream(uri)?.use { stream ->
-                            json.parseToJsonElement(stream.bufferedReader().readText())
-                        }
+                report(label, "Invio al server…")
+
+                val size = withContext(Dispatchers.IO) { fileSize(resolver, uri) }
+                val queued = repository
+                    .importStreamingHistory(name, UriRequestBody(resolver, uri, size))
+                    .getOrElse { error ->
+                        failures += "$name: ${error.message}"
+                        return@forEachIndexed
                     }
-                }.getOrNull()
 
-                if (parsed == null) {
-                    failed++
+                val job = awaitJob(queued.jobId) { report(label, describe(it)) }.getOrElse { error ->
+                    failures += "$name: ${error.message}"
                     return@forEachIndexed
                 }
 
-                repository.importStreamingHistory(name, parsed as JsonElement)
-                    .onSuccess { imported += it.rowsImported }
-                    .onFailure { failed++ }
+                if (job.status == "error") {
+                    failures += "$name: ${job.error ?: "import non riuscito"}"
+                } else {
+                    imported += job.rowsImported
+                }
+                enrichmentRunning = job.enrichment?.running == true
             }
 
             _importProgress.value = ImportProgress(
                 running = false,
                 message = buildString {
                     append("$imported ascolti importati")
-                    if (failed > 0) append(", $failed file non riusciti")
+                    if (enrichmentRunning) {
+                        append(". Foto e generi degli artisti arrivano man mano.")
+                    }
+                    failures.forEach { append("\n$it") }
                 },
             )
             load()
         }
     }
+
+    private fun report(label: String, phase: String) {
+        _importProgress.value = ImportProgress(running = true, message = "$label\n$phase")
+    }
+
+    /**
+     * Attende la fine di un import interrogandone lo stato.
+     *
+     * Un errore di rete durante l'attesa non significa che l'import sia
+     * fallito: gira sul server e prosegue anche a telefono scollegato. Per
+     * questo si riprova invece di dichiarare subito il fallimento.
+     */
+    private suspend fun awaitJob(jobId: String, onProgress: (ImportJob) -> Unit): Result<ImportJob> {
+        var networkFailures = 0
+
+        while (true) {
+            val result = repository.importJob(jobId)
+            val job = result.getOrNull()
+
+            if (job == null) {
+                val error = result.exceptionOrNull() ?: Exception("Stato non leggibile")
+                networkFailures++
+                if (error is SessionExpiredException || networkFailures > MAX_POLL_FAILURES) {
+                    return Result.failure(error)
+                }
+            } else {
+                networkFailures = 0
+                onProgress(job)
+                if (job.finished) return Result.success(job)
+            }
+
+            delay(POLL_INTERVAL_MS)
+        }
+    }
+
+    /** Il testo del passo lo scrive il server: qui si copre solo il caso vuoto. */
+    private fun describe(job: ImportJob): String =
+        if (job.status == "pending") "In coda"
+        else job.phase?.takeIf { it.isNotBlank() } ?: "Elaborazione in corso…"
+
+    /**
+     * Serve a dichiarare `Content-Length`. Senza, la richiesta parte in
+     * chunked: funziona, ma alcuni proxy la gestiscono peggio.
+     */
+    private fun fileSize(resolver: ContentResolver, uri: Uri): Long =
+        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) cursor.getLong(index)
+            else -1L
+        } ?: -1L
 
     fun dismissImportMessage() {
         _importProgress.value = ImportProgress()

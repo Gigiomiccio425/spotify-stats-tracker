@@ -1,6 +1,6 @@
 package it.spotifystats.app.data.api
 
-import kotlinx.serialization.json.JsonElement
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -92,10 +92,26 @@ interface ApiService {
     @GET("api/recaps/{type}/{key}")
     suspend fun recap(@Path("type") type: String, @Path("key") key: String): Recap
 
-    /** Il corpo è la lista grezza letta dal file Streaming_History_Audio_*.json. */
+    /**
+     * Il corpo è il file `Streaming_History_Audio_*.json` inviato tale e quale.
+     *
+     * `RequestBody` e non un oggetto serializzato: questi file arrivano a
+     * decine di MB, e costruirne l'albero JSON in memoria sul telefono per poi
+     * riserializzarlo occupa parecchie volte la dimensione del file. Così
+     * viene copiato dal disco al socket, senza passare per la memoria.
+     *
+     * Risponde 202 appena il file è in coda, non a import concluso.
+     */
     @POST("api/import/streaming-history")
     suspend fun importStreamingHistory(
         @Query("filename") filename: String,
-        @Body entries: JsonElement,
-    ): ImportResult
+        @Body file: RequestBody,
+    ): QueuedImport
+
+    @GET("api/import/jobs/{id}")
+    suspend fun importJob(@Path("id") id: String): ImportJob
+
+    /** I più recenti per primi: serve a riagganciare un import lasciato a metà. */
+    @GET("api/import/jobs")
+    suspend fun importJobs(): ImportJobsResponse
 }

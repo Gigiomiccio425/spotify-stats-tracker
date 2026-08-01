@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import { getAppAccessToken } from '../auth/spotify.js';
 import { db } from '../db/client.js';
 import { albumArtists, albums, artists, trackArtists, tracks } from '../db/schema.js';
@@ -134,24 +134,42 @@ export async function enrichPendingArtists(limit = 200): Promise<number> {
 
   const token = await getAppAccessToken();
   const full = await getArtistsByIds(token, pending.map((a) => a.id));
-  if (full.length === 0) return 0;
 
-  await db
-    .insert(artists)
-    .values(full.map(toArtistRow))
-    .onConflictDoUpdate({
-      target: artists.id,
-      set: {
-        name: sql`excluded.name`,
-        imageUrl: sql`excluded.image_url`,
-        genres: sql`excluded.genres`,
-        popularity: sql`excluded.popularity`,
-        followers: sql`excluded.followers`,
-        fetchedAt: sql`excluded.fetched_at`,
-      },
-    });
+  if (full.length) {
+    await db
+      .insert(artists)
+      .values(full.map(toArtistRow))
+      .onConflictDoUpdate({
+        target: artists.id,
+        set: {
+          name: sql`excluded.name`,
+          imageUrl: sql`excluded.image_url`,
+          genres: sql`excluded.genres`,
+          popularity: sql`excluded.popularity`,
+          followers: sql`excluded.followers`,
+          fetchedAt: sql`excluded.fetched_at`,
+        },
+      });
+  }
 
-  return full.length;
+  // Spotify non restituisce nulla per gli artisti spariti dal catalogo. Senza
+  // marcarli come tentati resterebbero in cima alla coda per sempre: ogni
+  // tornata successiva ripescherebbe gli stessi, e nessun altro artista
+  // verrebbe più completato.
+  const returned = new Set(full.map((a) => a.id));
+  const unresolved = pending.filter((a) => !returned.has(a.id)).map((a) => a.id);
+
+  if (unresolved.length) {
+    await db
+      .update(artists)
+      .set({ popularity: sql`coalesce(${artists.popularity}, 0)`, fetchedAt: new Date() })
+      .where(inArray(artists.id, unresolved));
+  }
+
+  // Il totale è "quanti artisti sono usciti dalla coda", non "quanti sono
+  // stati arricchiti": chi cicla su questa funzione deve poter capire quando
+  // non resta più nulla da fare.
+  return full.length + unresolved.length;
 }
 
 export function toArtistRow(a: SpotifyArtist): typeof artists.$inferInsert {

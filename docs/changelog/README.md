@@ -27,3 +27,4 @@ reintroduce il bug che avevano risolto.
 |---|---|
 | [0001-baseline-app.md](0001-baseline-app.md) | Stato completo dell'app: schermate, API, comportamenti |
 | [0002-fix-404-recap-giornalieri.md](0002-fix-404-recap-giornalieri.md) | 404 sui recap giornalieri con ora di inizio pomeridiana |
+| [0003-import-storico-in-sottofondo.md](0003-import-storico-in-sottofondo.md) | Import dell'archivio in coda, con avanzamento: prima falliva sempre |

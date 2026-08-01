@@ -227,11 +227,18 @@ export const importJobs = pgTable(
     filename: text('filename').notNull(),
     /** 'pending' | 'running' | 'done' | 'error' */
     status: text('status').notNull().default('pending'),
+    /**
+     * Passo corrente, in italiano e già pronto da mostrare. L'import di un
+     * archivio di anni dura minuti: senza un segnale di avanzamento l'app non
+     * saprebbe distinguere "sta lavorando" da "si è piantato".
+     */
+    phase: text('phase'),
     rowsTotal: integer('rows_total').notNull().default(0),
     rowsImported: integer('rows_imported').notNull().default(0),
     rowsSkipped: integer('rows_skipped').notNull().default(0),
     error: text('error'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    startedAt: timestamp('started_at', tz),
     finishedAt: timestamp('finished_at', tz),
   },
   (t) => [index('import_jobs_user_idx').on(t.userId, t.createdAt.desc())],

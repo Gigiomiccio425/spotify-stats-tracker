@@ -293,6 +293,14 @@ private fun SettingsContent(
                 style = MaterialTheme.typography.labelSmall,
                 color = TextTertiary,
             )
+            VerticalSpacer(6)
+            Text(
+                "Un archivio di anni richiede diversi minuti: il server deve chiedere a Spotify " +
+                    "ogni brano. Il lavoro prosegue sul server anche se chiudi l'app, e riaprendo " +
+                    "questa schermata puoi ricaricare i file rimasti indietro.",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+            )
             VerticalSpacer(8)
             TextButton(
                 onClick = { filePicker.launch(arrayOf("application/json", "text/plain", "*/*")) },

@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception';
 import { logger } from 'hono/logger';
 import { runMigrations } from './db/migrate.js';
 import { env } from './env.js';
+import { resetStuckImportJobs } from './jobs/import.js';
 import { startScheduler } from './jobs/scheduler.js';
 import { accountRoutes } from './routes/account.js';
 import { authRoutes } from './routes/auth.js';
@@ -47,6 +48,10 @@ app.notFound((c) => c.json({ error: 'Endpoint non trovato' }, 404));
 if (env.RUN_MIGRATIONS) {
   await runMigrations();
 }
+
+// La coda degli import vive in memoria: un riavvio la perde. I job rimasti a
+// metà vanno chiusi, altrimenti bloccano per sempre i caricamenti successivi.
+await resetStuckImportJobs().catch((err) => console.error('[import] pulizia job fallita', err));
 
 // `0.0.0.0` e non il loopback: dentro un container, restare in ascolto solo su
 // 127.0.0.1 renderebbe il servizio irraggiungibile dagli altri container.

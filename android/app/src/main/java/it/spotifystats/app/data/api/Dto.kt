@@ -1,6 +1,5 @@
 package it.spotifystats.app.data.api
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -275,12 +274,47 @@ data class ArtistDetail(
     val topTracks: List<TopTrack> = emptyList(),
 )
 
+/** Risposta 202: il file è stato accettato e messo in coda. */
 @Serializable
-data class ImportResult(
-    @SerialName("jobId") val jobId: String,
+data class QueuedImport(
+    val jobId: String,
+    val rowsTotal: Int = 0,
+    val queuePosition: Int = 1,
+)
+
+/**
+ * Stato di un import in corso o concluso.
+ *
+ * `status` vale `pending` | `running` | `done` | `error`. `phase` è già testo
+ * pronto da mostrare, scritto dal server: l'app non deve tradurre nulla, e
+ * aggiungendo un passaggio lato server non serve ricompilarla.
+ */
+@Serializable
+data class ImportJob(
+    val id: String,
+    val filename: String,
+    val status: String,
+    val phase: String? = null,
     val rowsTotal: Int = 0,
     val rowsImported: Int = 0,
     val rowsSkipped: Int = 0,
+    val error: String? = null,
+    val enrichment: EnrichmentStatus? = null,
+) {
+    val finished: Boolean get() = status == "done" || status == "error"
+}
+
+/** Recupero di foto e generi degli artisti, che prosegue a import concluso. */
+@Serializable
+data class EnrichmentStatus(
+    val running: Boolean = false,
+    val done: Int = 0,
+)
+
+@Serializable
+data class ImportJobsResponse(
+    val jobs: List<ImportJob> = emptyList(),
+    val enrichment: EnrichmentStatus? = null,
 )
 
 @Serializable

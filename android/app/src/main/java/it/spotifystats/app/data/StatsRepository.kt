@@ -1,13 +1,16 @@
 package it.spotifystats.app.data
 
+import it.spotifystats.app.data.api.ApiClient
 import it.spotifystats.app.data.api.ApiService
 import it.spotifystats.app.data.api.ArtistDetail
 import it.spotifystats.app.data.api.BackendNotConfiguredException
 import it.spotifystats.app.data.api.ClockResponse
 import it.spotifystats.app.data.api.HistoryResponse
-import it.spotifystats.app.data.api.ImportResult
+import it.spotifystats.app.data.api.ImportJob
+import it.spotifystats.app.data.api.ImportJobsResponse
 import it.spotifystats.app.data.api.Me
 import it.spotifystats.app.data.api.Overview
+import it.spotifystats.app.data.api.QueuedImport
 import it.spotifystats.app.data.api.Recap
 import it.spotifystats.app.data.api.RecapListResponse
 import it.spotifystats.app.data.api.ReleaseYearStats
@@ -22,7 +25,9 @@ import it.spotifystats.app.data.api.TrackDetail
 import it.spotifystats.app.data.api.WeekdaysResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.RequestBody
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -51,14 +56,32 @@ class StatsRepository(
                     session.clear()
                     throw SessionExpiredException()
                 }
+                // 413 arriva dal proxy davanti al server, non dal backend: il
+                // corpo è una pagina HTML, quindi nessun messaggio da leggere.
+                error is HttpException && error.code() == 413 ->
+                    throw Exception(
+                        "File troppo grande per il server. Carica i file dell'archivio uno alla " +
+                            "volta; se un singolo file supera i 100 MB va diviso.",
+                    )
                 error is HttpException ->
-                    throw Exception("Il server ha risposto ${error.code()}")
+                    throw Exception(serverMessage(error) ?: "Il server ha risposto ${error.code()}")
                 error is IOException ->
                     throw Exception("Server irraggiungibile. Controlla la connessione e l'indirizzo del backend.")
                 else -> throw error
             }
         }
     }
+
+    /**
+     * Il backend spiega sempre il motivo in `{"error": "..."}`. Mostrare solo
+     * il codice HTTP costringeva a leggere i log del server per capire cosa
+     * fosse andato storto: un file nel formato sbagliato e un import già in
+     * corso apparivano identici.
+     */
+    private fun serverMessage(error: HttpException): String? = runCatching {
+        val body = error.response()?.errorBody()?.string()?.takeIf { it.isNotBlank() } ?: return null
+        ApiClient.json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
+    }.getOrNull()
 
     suspend fun me(): Result<Me> = call { api.me() }
 
@@ -112,8 +135,19 @@ class StatsRepository(
 
     suspend fun artistDetail(id: String): Result<ArtistDetail> = call { api.artistDetail(id) }
 
-    suspend fun importStreamingHistory(filename: String, entries: JsonElement): Result<ImportResult> =
-        call { api.importStreamingHistory(filename, entries) }
+    /**
+     * Manda il file così com'è, senza leggerlo in memoria: [body] scrive
+     * direttamente sul socket leggendo dal file scelto dall'utente.
+     *
+     * Il server risponde appena ha accodato il lavoro, non quando ha finito:
+     * l'avanzamento si segue con [importJob].
+     */
+    suspend fun importStreamingHistory(filename: String, body: RequestBody): Result<QueuedImport> =
+        call { api.importStreamingHistory(filename, body) }
+
+    suspend fun importJob(id: String): Result<ImportJob> = call { api.importJob(id) }
+
+    suspend fun importJobs(): Result<ImportJobsResponse> = call { api.importJobs() }
 
     suspend fun logout() = session.clear()
 }
